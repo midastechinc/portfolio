@@ -127,6 +127,36 @@ Save the file and re-upload it to GitHub (or commit the change).
 
 ---
 
+## LinkedIn Pull Setup
+
+The repo now includes a GitHub Actions workflow and Python scraper for the LeadTracker dashboard.
+
+### Required tables
+
+Run the latest `schema.sql` in Supabase so these tables exist:
+
+- `linkedin_received_invites`
+- `linkedin_message_replies`
+- `linkedin_sent_invites`
+
+### Required GitHub Actions secrets
+
+Add these repo secrets in GitHub for `midastechinc/portfolio`:
+
+- `LINKEDIN_EMAIL`
+- `LINKEDIN_PASSWORD`
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+### Triggering
+
+- Manual: dispatch `linkedin_pull.yml`
+- Automatic: runs daily at `13:15 UTC`
+
+The workflow installs Playwright, logs into LinkedIn, scrapes the three dashboard sections, and replaces the table contents in Supabase with the latest pull.
+
+---
+
 ## Support
 
 Ali Jaffar — Midas Tech Inc.  
