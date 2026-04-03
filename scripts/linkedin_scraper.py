@@ -8,14 +8,16 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from playwright.async_api import async_playwright
 from supabase import Client, create_client
 
-
-SUPABASE_URL = os.environ["SUPABASE_URL"]
-SUPABASE_SERVICE_ROLE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
-LINKEDIN_EMAIL = os.environ["LINKEDIN_EMAIL"]
-LINKEDIN_PASSWORD = os.environ["LINKEDIN_PASSWORD"]
-
 COOKIE_FILE = Path(os.environ.get("LINKEDIN_COOKIE_FILE", ".cache/linkedin_session.json"))
 HEADLESS = os.environ.get("LINKEDIN_HEADLESS", "true").lower() != "false"
+BOOTSTRAP_SESSION_ONLY = os.environ.get("LINKEDIN_BOOTSTRAP_SESSION_ONLY", "false").lower() == "true"
+
+
+def require_env(name: str) -> str:
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
 
 
 def utc_now_iso() -> str:
@@ -23,7 +25,7 @@ def utc_now_iso() -> str:
 
 
 def get_supabase() -> Client:
-    return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+    return create_client(require_env("SUPABASE_URL"), require_env("SUPABASE_SERVICE_ROLE_KEY"))
 
 
 def ensure_parent_dir(path: Path) -> None:
@@ -65,9 +67,11 @@ async def wait_for_post_login(page) -> None:
 
 async def login_linkedin(page, context) -> None:
     print("[*] Logging into LinkedIn...")
+    linkedin_email = require_env("LINKEDIN_EMAIL")
+    linkedin_password = require_env("LINKEDIN_PASSWORD")
     await page.goto("https://www.linkedin.com/login", wait_until="domcontentloaded")
-    await page.locator("#username").fill(LINKEDIN_EMAIL)
-    await page.locator("#password").fill(LINKEDIN_PASSWORD)
+    await page.locator("#username").fill(linkedin_email)
+    await page.locator("#password").fill(linkedin_password)
     await page.locator('[type="submit"]').click()
     await wait_for_post_login(page)
     print("[+] Login successful")
@@ -86,6 +90,30 @@ async def ensure_linkedin_session(page, context) -> None:
         print("[!] Existing session expired, logging in again...")
 
     await login_linkedin(page, context)
+
+
+async def bootstrap_linkedin_session(page, context) -> None:
+    print("[*] Starting LinkedIn bootstrap session mode...")
+    print("[*] A visible browser window should open.")
+    print("[*] Complete any LinkedIn login, MFA, or security challenge in that browser.")
+    print("[*] The script will save cookies once you land on a signed-in LinkedIn page.")
+
+    await page.goto("https://www.linkedin.com/login", wait_until="domcontentloaded")
+    deadline_seconds = 300
+
+    for _ in range(deadline_seconds):
+        url = page.url.lower()
+        if "linkedin.com/feed" in url or "linkedin.com/mynetwork" in url or "linkedin.com/messaging" in url:
+            await page.wait_for_load_state("networkidle")
+            await save_cookies(context, COOKIE_FILE)
+            print(f"[+] Bootstrap complete. Session saved to {COOKIE_FILE}")
+            return
+        await asyncio.sleep(1)
+
+    raise RuntimeError(
+        "Timed out waiting for a successful LinkedIn login during bootstrap mode. "
+        "Try again and complete the sign-in/challenge in the opened browser window."
+    )
 
 
 async def page_scroll_to_bottom(page, times: int) -> None:
@@ -247,8 +275,6 @@ async def main() -> None:
     print(f" {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 56)
 
-    supabase = get_supabase()
-
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(headless=HEADLESS)
         context = await browser.new_context(
@@ -261,6 +287,12 @@ async def main() -> None:
         )
         page = await context.new_page()
 
+        if BOOTSTRAP_SESSION_ONLY:
+            await bootstrap_linkedin_session(page, context)
+            await browser.close()
+            return
+
+        supabase = get_supabase()
         await ensure_linkedin_session(page, context)
 
         received = await scrape_received_invites(page)

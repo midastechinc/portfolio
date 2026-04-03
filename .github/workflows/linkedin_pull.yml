@@ -24,6 +24,16 @@ jobs:
           path: .cache/linkedin_session.json
           key: linkedin-session-${{ github.repository }}
 
+      - name: Seed LinkedIn session from secret
+        env:
+          LINKEDIN_SESSION_JSON: ${{ secrets.LINKEDIN_SESSION_JSON }}
+        run: |
+          if [ -n "$LINKEDIN_SESSION_JSON" ] && [ ! -f .cache/linkedin_session.json ]; then
+            mkdir -p .cache
+            printf "%s" "$LINKEDIN_SESSION_JSON" > .cache/linkedin_session.json
+            echo "Seeded LinkedIn session from repository secret." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - name: Install Python dependencies
         run: pip install -r requirements-linkedin.txt
 
@@ -34,6 +44,7 @@ jobs:
         env:
           LINKEDIN_EMAIL: ${{ secrets.LINKEDIN_EMAIL }}
           LINKEDIN_PASSWORD: ${{ secrets.LINKEDIN_PASSWORD }}
+          LINKEDIN_SESSION_JSON: ${{ secrets.LINKEDIN_SESSION_JSON }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
@@ -47,6 +58,9 @@ jobs:
           if [ "$missing" -ne 0 ]; then
             echo "Add the missing secrets in GitHub -> Settings -> Secrets and variables -> Actions." >> "$GITHUB_STEP_SUMMARY"
             exit 1
+          fi
+          if [ -z "$LINKEDIN_SESSION_JSON" ]; then
+            echo "LINKEDIN_SESSION_JSON is not set. The workflow will try a fresh login, which may trigger a LinkedIn security challenge." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Run LinkedIn scraper
