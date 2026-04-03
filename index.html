@@ -239,18 +239,20 @@ body::before {
         <div class="auth-sub">PRIVATE DASHBOARD</div>
       </div>
     </div>
-    <div id="authLogin">
+    <div id="authStep1">
       <div class="auth-h">Sign in</div>
-      <div class="auth-desc">Enter your email to receive a magic link — no password needed.</div>
+      <div class="auth-desc">Enter your email — we'll send you a 6-digit code.</div>
       <input class="auth-input" type="email" id="authEmail" placeholder="your@email.com" inputmode="email" autocomplete="email">
       <div class="auth-err" id="authErr"></div>
-      <button class="auth-btn auth-btn-primary" onclick="sendMagicLink()">Send Magic Link</button>
+      <button class="auth-btn auth-btn-primary" id="authSendBtn" onclick="sendOTP()">Send Code</button>
     </div>
-    <div id="authCheck" style="display:none">
-      <div class="auth-h">Check your email 📬</div>
-      <div class="auth-desc" id="authCheckMsg">A sign-in link was sent. Tap it on your phone or desktop — you'll be signed in automatically.</div>
-      <div class="auth-info" id="authInfo"></div>
-      <button class="auth-btn auth-btn-ghost" onclick="showLogin()">← Use different email</button>
+    <div id="authStep2" style="display:none">
+      <div class="auth-h">Enter your code</div>
+      <div class="auth-desc" id="authCodeMsg">Check your email for a 6-digit code.</div>
+      <input class="auth-input" type="text" id="authCode" placeholder="123456" inputmode="numeric" maxlength="6" autocomplete="one-time-code" style="letter-spacing:8px;font-size:22px;text-align:center">
+      <div class="auth-err" id="authCodeErr"></div>
+      <button class="auth-btn auth-btn-primary" id="authVerifyBtn" onclick="verifyOTP()">Sign In</button>
+      <button class="auth-btn auth-btn-ghost" onclick="showStep1()" style="margin-top:8px">← Different email</button>
     </div>
   </div>
 </div>
@@ -406,51 +408,59 @@ function setSyncStatus(s) {
 }
 
 // ─── Auth ────────────────────────────────────────────────
-async function sendMagicLink() {
+let otpEmail = '';
+
+async function sendOTP() {
   const email = document.getElementById('authEmail').value.trim();
   const errEl = document.getElementById('authErr');
-  const btn = document.querySelector('.auth-btn-primary');
+  const btn = document.getElementById('authSendBtn');
   errEl.textContent = '';
-  errEl.style.color = 'var(--red)';
 
-  if(!email || !email.includes('@')) {
-    errEl.textContent = 'Enter a valid email address.';
-    return;
-  }
-  if(!sb) {
-    errEl.textContent = 'Config error — check config.js is uploaded.';
-    return;
-  }
+  if(!email || !email.includes('@')) { errEl.textContent = 'Enter a valid email address.'; return; }
+  if(!sb) { errEl.textContent = 'Config error — check config.js is uploaded.'; return; }
 
-  btn.textContent = 'Sending…';
-  btn.disabled = true;
-
+  btn.textContent = 'Sending…'; btn.disabled = true;
   try {
-    const redirectTo = window.location.origin + window.location.pathname;
-    const { error } = await sb.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: redirectTo }
-    });
-    if(error) {
-      errEl.textContent = error.message;
-      btn.textContent = 'Send Magic Link';
-      btn.disabled = false;
-      return;
-    }
-    document.getElementById('authLogin').style.display = 'none';
-    document.getElementById('authCheck').style.display = '';
-    document.getElementById('authCheckMsg').textContent = 'Magic link sent to ' + email + ' — check your inbox (and spam).';
+    const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: true } });
+    if(error) { errEl.textContent = error.message; btn.textContent = 'Send Code'; btn.disabled = false; return; }
+    otpEmail = email;
+    document.getElementById('authStep1').style.display = 'none';
+    document.getElementById('authStep2').style.display = '';
+    document.getElementById('authCodeMsg').textContent = '6-digit code sent to ' + email + ' — check inbox and spam.';
+    setTimeout(() => document.getElementById('authCode').focus(), 300);
   } catch(e) {
     errEl.textContent = 'Error: ' + e.message;
-    btn.textContent = 'Send Magic Link';
-    btn.disabled = false;
+    btn.textContent = 'Send Code'; btn.disabled = false;
   }
 }
 
-function showLogin() {
-  document.getElementById('authLogin').style.display = '';
-  document.getElementById('authCheck').style.display = 'none';
+async function verifyOTP() {
+  const code = document.getElementById('authCode').value.trim();
+  const errEl = document.getElementById('authCodeErr');
+  const btn = document.getElementById('authVerifyBtn');
+  errEl.textContent = '';
+
+  if(!code || code.length < 6) { errEl.textContent = 'Enter the 6-digit code.'; return; }
+
+  btn.textContent = 'Verifying…'; btn.disabled = true;
+  try {
+    const { data, error } = await sb.auth.verifyOtp({ email: otpEmail, token: code, type: 'email' });
+    if(error) { errEl.textContent = error.message; btn.textContent = 'Sign In'; btn.disabled = false; return; }
+    if(data.session) showApp(data.session.user);
+  } catch(e) {
+    errEl.textContent = 'Error: ' + e.message;
+    btn.textContent = 'Sign In'; btn.disabled = false;
+  }
 }
+
+function showStep1() {
+  document.getElementById('authStep1').style.display = '';
+  document.getElementById('authStep2').style.display = 'none';
+  document.getElementById('authSendBtn').textContent = 'Send Code';
+  document.getElementById('authSendBtn').disabled = false;
+}
+
+function showLogin() { showStep1(); }
 
 async function signOut() {
   if(!confirm('Sign out?')) return;
