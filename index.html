@@ -408,6 +408,7 @@ async function anthropicMessages(bodyObj) {
     if (k.length < 21) throw new Error('Missing API key — set mt-anthropic-key or mt-anthropic-proxy');
     h['x-api-key'] = k;
   }
+  try { window.__mtLastAiUrl = url; } catch (z) {}
   return fetch(url, {method:'POST', headers:h, body:JSON.stringify(bodyObj)});
 }
 
@@ -937,7 +938,9 @@ async function callAI(stocks) {
     const d=await res.json().catch(()=>({}));
     if(!res.ok){
       const msg=(d.error&&d.error.message)||d.message||('HTTP '+res.status);
-      w.innerHTML='<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">API: '+escapeHtml(msg)+'</div><div class="name-hint" style="margin-top:12px;text-align:left">Open the browser console on this page and run:<br><code style="color:var(--cyan);word-break:break-all">localStorage.setItem(&quot;mt-anthropic-key&quot;,&quot;YOUR_ANTHROPIC_API_KEY&quot;)</code><br>then refresh. Keys stay in your browser only. If you see a CORS error, use a small backend proxy instead of calling the API from the page.</div></div>';
+      const viaProxy=(typeof window!=='undefined'&&window.__mtLastAiUrl&&window.__mtLastAiUrl.indexOf('anthropic.com')===-1);
+      const hint403=viaProxy?'<div class="name-hint" style="margin-top:12px">Proxy returned an error. Check Vercel → env <code style="color:var(--cyan)">ANTHROPIC_API_KEY</code> and function logs.</div>':'';
+      w.innerHTML='<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">API: '+escapeHtml(msg)+'</div>'+hint403+'</div>';
       toast('AI API error — see Advice tab', '#ff4d6a');
       return false;
     }
@@ -956,9 +959,20 @@ async function callAI(stocks) {
   } catch(e){
     const m=e.message||String(e);
     const looksLikeCors=/failed to fetch|networkerror|load failed|network request failed/i.test(m);
-    const hint=looksLikeCors?'<div class="name-hint" style="margin-top:12px;text-align:left">The browser blocked the request to Anthropic (normal for GitHub Pages). Use the <strong>proxy</strong>: deploy <code style="color:var(--cyan)">api/anthropic.js</code> on Vercel, set server env <code style="color:var(--cyan)">ANTHROPIC_API_KEY</code>, then run <code style="color:var(--cyan);word-break:break-all">localStorage.setItem(&quot;mt-anthropic-proxy&quot;,&quot;https://…vercel.app/api/anthropic&quot;)</code> and refresh.</div>':'';
+    let last='';
+    try { last = window.__mtLastAiUrl || ''; } catch (z) {}
+    const hitProxy=last && last.indexOf('anthropic.com')===-1;
+    const hitDirect=last && last.indexOf('anthropic.com')!==-1;
+    let hint='';
+    if (looksLikeCors && hitDirect) {
+      hint='<div class="name-hint" style="margin-top:12px;text-align:left">The page tried <strong>api.anthropic.com</strong> directly (blocked from GitHub Pages). Use the latest <code style="color:var(--cyan)">index.html</code> (default proxy) or set:<br><code style="color:var(--cyan);word-break:break-all">localStorage.setItem(&quot;mt-anthropic-proxy&quot;,&quot;https://portfolio-lake-delta-uzgpfwpwmx.vercel.app/api/anthropic&quot;)</code></div>';
+    } else if (looksLikeCors && hitProxy) {
+      hint='<div class="name-hint" style="margin-top:12px;text-align:left">The <strong>Vercel proxy</strong> request failed (often CORS). Redeploy the latest <code style="color:var(--cyan)">api/anthropic.js</code> (open CORS). Remove env <code style="color:var(--cyan)">ALLOW_ORIGIN</code> unless you set <code style="color:var(--cyan)">CORS_STRICT=1</code> and an exact origin match. Tried: <code style="color:var(--cyan);word-break:break-all">'+escapeHtml(last)+'</code></div>';
+    } else if (looksLikeCors) {
+      hint='<div class="name-hint" style="margin-top:12px;text-align:left">Network blocked the AI request. Check DevTools → Network for the failing URL.</div>';
+    }
     w.innerHTML='<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Network: '+escapeHtml(m)+'</div>'+hint+'</div>';
-    toast(looksLikeCors?'Use Vercel proxy — see message on Advice tab':'Network error', '#ff4d6a');
+    toast(looksLikeCors?'AI request blocked — see Advice tab':'Network error', '#ff4d6a');
     return false;
   }
 }
