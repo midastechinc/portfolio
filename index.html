@@ -419,6 +419,10 @@ body::before {
 <script>
 // ─── No external dependencies ───────────────────────────
 const sb = null; // Supabase removed — using localStorage
+const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const ADVICE_MAX_OUT = 3072;
+const ADVICE_STAGGER_MS = 13000;
+function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
 // ─── State ───────────────────────────────────────────────
 let holdings = [];
@@ -829,7 +833,7 @@ async function fetchPriceFor(ticker) {
   if (!canCallAnthropic()) return false;
   try {
     const res = await anthropicMessages({
-        model:'claude-sonnet-4-20250514', max_tokens:300,
+        model: CLAUDE_MODEL, max_tokens: 220,
         tools:[{type:'web_search_20250305', name:'web_search'}],
         messages:[{role:'user', content:'Search for the current stock price of ' + ticker + '. Reply ONLY with a JSON object, nothing else: {"price":123.45,"change":1.23,"changePct":0.92,"companyName":"Company Name"}'}]
     });
@@ -1011,9 +1015,9 @@ async function fetchNews() {
   w.innerHTML='<div class="loading-row"><div class="spinner"></div> Fetching news for '+tickers+'…</div>';
   try {
     if (!canCallAnthropic()) { w.innerHTML='<div class="empty"><div class="empty-icon">🔑</div><div class="empty-text">Set API key or proxy (see Advice tab help)</div></div>'; return; }
-    const res=await anthropicMessages({model:'claude-sonnet-4-20250514',max_tokens:1500,
+    const res=await anthropicMessages({model: CLAUDE_MODEL, max_tokens: 900,
         tools:[{type:'web_search_20250305',name:'web_search'}],
-        messages:[{role:'user',content:'Search for the latest financial news (last 48 hours) for these stocks: '+tickers+'. Return ONLY a JSON array, no markdown: [{"ticker":"AAPL","title":"Headline","summary":"One sentence.","source":"Reuters","age":"2h ago","sentiment":"positive"}]. Sentiment: positive, negative, or neutral. Up to 8 items.'}]});
+        messages:[{role:'user',content:'News (48h) for: '+tickers+'. JSON only, max 6 items: [{"ticker":"AAPL","title":"…","summary":"one line","source":"…","age":"…","sentiment":"positive|negative|neutral"}]'}]});
     const d=await res.json();
     const tb=d.content&&d.content.find(b=>b.type==='text');
     if(tb){const m=tb.text.replace(/```json|```/g,'').trim().match(/\[[\s\S]*\]/);if(m){renderNews(JSON.parse(m[0]));return;}}
@@ -1060,28 +1064,8 @@ async function runAIAll() {
 }
 
 function buildFundamentalAnalysisPrompt(holdingsBlock) {
-  return 'You are a senior equity research analyst. For EACH ticker below you MUST use web_search to gather recent fundamentals (filings, investor decks, or reputable financial data). Apply this valuation framework before recommending.\n\n' +
-    '## 1) Relative valuation (comparison)\n' +
-    '- Report P/E, PEG, P/S, and P/B where meaningful (label currency; say approx/estimated when needed).\n' +
-    '- PEG = (P/E) divided by expected annual EPS growth rate (as a number, e.g. growth 12% means denominator 12). Interpret: PEG below ~1 often suggests better value vs growth; ~1 fair; above ~2 potentially expensive vs growth.\n' +
-    '- Briefly compare to sector peers or the stock own history when possible.\n\n' +
-    '## 2) Absolute valuation (intrinsic)\n' +
-    '- Primary: multi-year DCF-style logic on free cash flow (FCF): present value of FCF for projection years t=1..n using discount rate r (WACC or explicit discount, often ~8–12% for mature firms unless justified).\n' +
-    '- Terminal value (Gordon growth): TV = FCF_{n+1} / (r - g) with perpetual growth g < r (g often ~2–3% long-run).\n' +
-    '- Equity per share: Enterprise Value minus net debt plus cash approximates equity value; divide by diluted shares for intrinsic value per share.\n' +
-    '- Give an intrinsic VALUE RANGE per share (not fake precision), with currency.\n' +
-    '- If dividends are central to the thesis, add one sentence on dividend discount model (DDM) relevance.\n\n' +
-    '## 3) Qualitative (moat)\n' +
-    '- Economic moat, management quality / alignment (buybacks, insider ownership), industry growth vs disruption risk.\n\n' +
-    '## 4) Pre-buy checklist (state PASS, WATCH, or FAIL each with one short reason)\n' +
-    '- Profitability and FCF trend (~5 years if data exists).\n' +
-    '- Debt manageable: Debt/Equity roughly under ~2 as a rule of thumb unless sector norms differ.\n' +
-    '- Margin of safety: compare market price to intrinsic range; pros often want ~20–30% discount to conservative intrinsic.\n\n' +
-    '## Recommendation\n' +
-    '- Output exactly one of: BUY MORE, HOLD, SELL (use BUY MORE not BUY).\n\n' +
-    'Holdings (user avg cost; last price from app may be stale—verify market price via search):\n' + holdingsBlock + '\n\n' +
-    'Return ONLY a JSON array. No markdown code fences. Each object MUST include all keys in this example (use strings; use N/A only when truly not applicable):\n' +
-    '[{"ticker":"SYM","recommendation":"HOLD","confidence":"HIGH","summaryVerdict":"...","relativeValuation":{"pe":"...","peNote":"...","peg":"...","pegNote":"...","ps":"...","pb":"...","peerComparison":"..."},"absoluteValuation":{"methodPrimary":"DCF","discountRatePct":"10","projectionYears":"5","terminalGrowthPct":"2.5","intrinsicRangePerShare":"$X–$Y CUR","currentPriceInAnalysis":"$Z CUR","marginOfSafetyPct":"20","marginOfSafetyNote":"...","equityBridgeNote":"EV, debt, cash, shares — one line"},"dividendModelNote":"... or N/A","qualitative":{"moat":"...","management":"...","industryTrends":"..."},"checklist":{"profitableTrend":"PASS — ...","debtManageable":"WATCH — ...","marginOfSafetyOk":"FAIL — ..."},"reasoning":"...","keyRisk":"...","keyPositive":"..."}]';
+  return 'Use web_search for fundamentals. For each ticker: relative (P/E,PEG=P/E÷EPS growth %,P/S,P/B, brief vs peers), DCF-style (FCF PV, terminal TV=FCF_{n+1}/(r-g), g<r, EV−debt+cash→equity/share, intrinsic RANGE + currency), moat/management/industry, checklist lines PASS|WATCH|FAIL (profit/FCF, D/E~2, margin of safety vs intrinsic). Recommendation: BUY MORE, HOLD, or SELL only.\n\nHoldings (verify price via search):\n' + holdingsBlock +
+    '\n\nReply with ONLY a JSON array (no markdown). One object per ticker, all keys required, strings only, terse values: ticker,recommendation,confidence,summaryVerdict,relativeValuation{pe,peNote,peg,pegNote,ps,pb,peerComparison},absoluteValuation{methodPrimary,discountRatePct,projectionYears,terminalGrowthPct,intrinsicRangePerShare,currentPriceInAnalysis,marginOfSafetyPct,marginOfSafetyNote,equityBridgeNote},dividendModelNote,qualitative{moat,management,industryTrends},checklist{profitableTrend,debtManageable,marginOfSafetyOk},reasoning,keyRisk,keyPositive.';
 }
 
 function checklistRowClass(text) {
@@ -1089,6 +1073,52 @@ function checklistRowClass(text) {
   if (t.startsWith('PASS')) return 'pass';
   if (t.startsWith('FAIL')) return 'fail';
   return 'watch';
+}
+
+function formatStocksInfoForPrompt(stocks) {
+  return stocks.map(function(s) {
+    return s.ticker + ': ' + (s.name || s.ticker) + ' | sh ' + s.shares + ' @ avg $' + s.cost + ' | last $' + (s.currentPrice != null ? s.currentPrice : '?') + ' | P&L% ' + s.plPct;
+  }).join('\n');
+}
+
+function showAdviceApiError(w, msg) {
+  const m = msg || 'Unknown error';
+  const rate = /rate limit|rate_limit|tokens per minute|TPM|429/i.test(m);
+  const viaProxy = typeof window !== 'undefined' && window.__mtLastAiUrl && window.__mtLastAiUrl.indexOf('anthropic.com') === -1;
+  let extra = '';
+  if (rate) {
+    extra = '<div class="name-hint" style="margin-top:12px;text-align:left">Your Anthropic org hit a <strong>per-minute token limit</strong>. Wait ~60 seconds and try again, or use <strong>Advice</strong> on one stock. <strong>Run All</strong> now analyzes one position at a time with pauses to reduce bursts.</div>';
+  } else if (viaProxy) {
+    extra = '<div class="name-hint" style="margin-top:12px">If this is not a rate limit: check Vercel env <code style="color:var(--cyan)">ANTHROPIC_API_KEY</code> and function logs.</div>';
+  }
+  w.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">API: ' + escapeHtml(m) + '</div>' + extra + '</div>';
+  toast(rate ? 'Rate limit — wait and retry' : 'AI API error — see Advice tab', '#ff4d6a');
+}
+
+async function requestAdviceArray(stocksSlice) {
+  const info = formatStocksInfoForPrompt(stocksSlice);
+  const res = await anthropicMessages({
+    model: CLAUDE_MODEL,
+    max_tokens: ADVICE_MAX_OUT,
+    tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+    messages: [{ role: 'user', content: buildFundamentalAnalysisPrompt(info) }]
+  });
+  const d = await res.json().catch(function() { return {}; });
+  if (!res.ok) {
+    const msg = (d.error && d.error.message) || d.message || ('HTTP ' + res.status);
+    return { ok: false, msg: msg };
+  }
+  const tb = d.content && d.content.find(function(b) { return b.type === 'text'; });
+  if (tb) {
+    const matched = tb.text.replace(/```json|```/g, '').trim().match(/\[[\s\S]*\]/);
+    if (matched) {
+      try {
+        const arr = JSON.parse(matched[0]);
+        if (Array.isArray(arr) && arr.length) return { ok: true, arr: arr };
+      } catch (pe) { console.warn(pe); }
+    }
+  }
+  return { ok: false, msg: 'Could not parse AI JSON. Try again.' };
 }
 
 async function callAI(stocks) {
@@ -1100,32 +1130,36 @@ async function callAI(stocks) {
     toast('Use proxy on GitHub Pages — see Advice tab', '#F0C040');
     return false;
   }
-  const info=stocks.map(s=>s.ticker+' ('+s.name+'): shares '+s.shares+', avg cost $'+s.cost+', app last price $'+(s.currentPrice!=null?s.currentPrice:'unknown')+', user P&L vs cost '+s.plPct+'%, session change % '+(s.todayChange!==undefined?s.todayChange:'unknown')).join('\n');
-  w.innerHTML='<div class="loading-row"><div class="spinner"></div> Contacting AI…</div>';
+  const fullContext = stocks;
   try {
-    const res=await anthropicMessages({model:'claude-sonnet-4-20250514',max_tokens:8192,
-        tools:[{type:'web_search_20250305',name:'web_search'}],
-        messages:[{role:'user',content:buildFundamentalAnalysisPrompt(info)}]});
-    const d=await res.json().catch(()=>({}));
-    if(!res.ok){
-      const msg=(d.error&&d.error.message)||d.message||('HTTP '+res.status);
-      const viaProxy=(typeof window!=='undefined'&&window.__mtLastAiUrl&&window.__mtLastAiUrl.indexOf('anthropic.com')===-1);
-      const hint403=viaProxy?'<div class="name-hint" style="margin-top:12px">Proxy returned an error. Check Vercel → env <code style="color:var(--cyan)">ANTHROPIC_API_KEY</code> and function logs.</div>':'';
-      w.innerHTML='<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">API: '+escapeHtml(msg)+'</div>'+hint403+'</div>';
-      toast('AI API error — see Advice tab', '#ff4d6a');
+    if (stocks.length === 1) {
+      w.innerHTML='<div class="loading-row"><div class="spinner"></div> Analyzing '+escapeHtml(stocks[0].ticker)+'…</div>';
+      const r = await requestAdviceArray(stocks);
+      if (r.ok) { renderAdvice(r.arr, fullContext); return true; }
+      showAdviceApiError(w, r.msg);
       return false;
     }
-    const tb=d.content&&d.content.find(b=>b.type==='text');
-    if(tb){
-      const m=tb.text.replace(/```json|```/g,'').trim().match(/\[[\s\S]*\]/);
-      if(m){
-        try {
-          const arr=JSON.parse(m[0]);
-          if(Array.isArray(arr)&&arr.length) { renderAdvice(arr,stocks); return true; }
-        } catch(pe) { console.warn(pe); }
+    var merged = [];
+    for (var i = 0; i < stocks.length; i++) {
+      w.innerHTML = '<div class="loading-row"><div class="spinner"></div> ' + (i + 1) + ' / ' + stocks.length + ' — ' + escapeHtml(stocks[i].ticker) + '…<span style="opacity:.75;margin-left:8px">(spacing requests)</span></div>';
+      if (i > 0) await sleep(ADVICE_STAGGER_MS);
+      const r = await requestAdviceArray([stocks[i]]);
+      if (r.ok) {
+        for (var j = 0; j < r.arr.length; j++) merged.push(r.arr[j]);
+      } else {
+        if (merged.length === 0) {
+          showAdviceApiError(w, r.msg);
+          return false;
+        }
+        toast('Stopped: ' + r.msg, '#F0C040');
+        break;
       }
     }
-    w.innerHTML='<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Could not parse AI response. Try &quot;Run All&quot; again.</div></div>';
+    if (merged.length) {
+      renderAdvice(merged, fullContext);
+      return true;
+    }
+    w.innerHTML='<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">No analysis returned.</div></div>';
     return false;
   } catch(e){
     const m=e.message||String(e);
