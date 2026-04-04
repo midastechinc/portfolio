@@ -191,6 +191,25 @@ body::before {
 .btn-lot-rm:active { transform:scale(.92); }
 .lots-summary { font-size:12px; color:var(--cyan); font-family:'DM Mono',monospace; margin-bottom:6px; min-height:18px; }
 .name-hint { font-size:11px; color:var(--muted); font-family:'DM Mono',monospace; margin-top:6px; line-height:1.4; }
+.field-ticker-wrap { position:relative; z-index:2; }
+.ticker-suggest {
+  display:none; position:absolute; left:0; right:0; top:calc(100% + 4px); max-height:min(240px,42vh); overflow-y:auto;
+  background:linear-gradient(180deg,#1e293b,#0f172a); border:1px solid var(--border2); border-radius:12px;
+  box-shadow:0 16px 48px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.04); z-index:60;
+  -webkit-overflow-scrolling:touch;
+}
+.ticker-suggest.open { display:block; }
+.ticker-suggest-item {
+  display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 10px; width:100%; text-align:left;
+  padding:11px 14px; border:none; border-bottom:1px solid var(--border); background:transparent; color:var(--text);
+  font-family:var(--font); font-size:13px; cursor:pointer; transition:background .12s;
+}
+.ticker-suggest-item:last-child { border-bottom:none; }
+.ticker-suggest-item:hover, .ticker-suggest-item.active { background:rgba(34,211,238,.1); }
+.ticker-sug-sym { font-family:'DM Mono',monospace; font-weight:600; color:var(--cyan); font-size:14px; flex-shrink:0; }
+.ticker-sug-name { flex:1; min-width:120px; line-height:1.35; color:var(--text); }
+.ticker-sug-ex { font-size:10px; color:var(--muted); font-family:'DM Mono',monospace; width:100%; margin-top:2px; }
+.ticker-suggest-empty { padding:14px; font-size:12px; color:var(--muted); font-family:'DM Mono',monospace; text-align:center; }
 
 /* ─── NEWS ─── */
 .news-card { background:linear-gradient(165deg,rgba(30,41,59,.45),rgba(15,23,42,.9)); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:12px; box-shadow:var(--shadow-sm); }
@@ -365,8 +384,8 @@ body::before {
     <div class="modal-handle"></div>
     <div class="modal-title">Add Holding</div>
     <div class="modal-body">
-      <div class="field"><label>Ticker Symbol</label><input type="text" id="m-t" placeholder="e.g. AAPL" style="text-transform:uppercase" autocomplete="off" autocorrect="off" spellcheck="false" onblur="scheduleTickerNameLookup()"></div>
-      <div class="field"><label>Company Name</label><input type="text" id="m-n" placeholder="Fills when you leave the ticker field" autocomplete="off" oninput="markCompanyNameManual()"><div class="name-hint">Editable — we look up the name from your symbol (Yahoo Finance).</div></div>
+      <div class="field field-ticker-wrap"><label>Symbol or company</label><input type="text" id="m-t" placeholder="e.g. AAPL or Apple" style="text-transform:uppercase" autocomplete="off" autocorrect="off" spellcheck="false" oninput="scheduleTickerSuggest()" onfocus="scheduleTickerSuggest()" onkeydown="tickerSuggestKeydown(event)" onblur="handleTickerFieldBlur()"><div id="m-t-suggest" class="ticker-suggest" role="listbox" aria-label="Matching symbols" onmouseenter="cancelTickerSuggestHide()" onmouseleave="scheduleHideTickerSuggestOnBlur()"></div></div>
+      <div class="field"><label>Company Name</label><input type="text" id="m-n" placeholder="Choose from list above or type" autocomplete="off" oninput="markCompanyNameManual()"><div class="name-hint">Pick a match from the dropdown, or enter a symbol and tab away — name comes from Yahoo Finance.</div></div>
       <div class="lots-wrap">
         <span class="lots-label">Purchase lots</span>
         <div id="m-lot-rows">
@@ -509,10 +528,164 @@ function mergeLotsFromRows(lots) {
   return { shares: totalShares, cost: basis / totalShares, lots: lots.map(l => ({ shares: l.shares, price: l.price })) };
 }
 
+function symNorm(s) {
+  return (s || '').toUpperCase().replace(/\.(TO|V|CN)$/,'').split('.')[0];
+}
+
 let tickerLookupTimer = null;
 function scheduleTickerNameLookup() {
   clearTimeout(tickerLookupTimer);
   tickerLookupTimer = setTimeout(() => fetchCompanyNameForTicker(), 400);
+}
+
+let tickerSuggestTimer = null;
+let tickerSuggestHideTimer = null;
+let tickerSuggestList = [];
+let tickerSuggestIndex = -1;
+
+function hideTickerSuggest() {
+  const box = document.getElementById('m-t-suggest');
+  if (box) { box.classList.remove('open'); box.innerHTML = ''; }
+  tickerSuggestIndex = -1;
+  tickerSuggestList = [];
+}
+
+function cancelTickerSuggestHide() {
+  clearTimeout(tickerSuggestHideTimer);
+}
+
+function scheduleHideTickerSuggestOnBlur() {
+  clearTimeout(tickerSuggestHideTimer);
+  tickerSuggestHideTimer = setTimeout(hideTickerSuggest, 220);
+}
+
+function handleTickerFieldBlur() {
+  scheduleTickerNameLookup();
+  scheduleHideTickerSuggestOnBlur();
+}
+
+function scheduleTickerSuggest() {
+  clearTimeout(tickerSuggestTimer);
+  tickerSuggestTimer = setTimeout(fetchTickerSuggest, 280);
+}
+
+function renderTickerSuggestItems() {
+  const box = document.getElementById('m-t-suggest');
+  if (!box) return;
+  box.innerHTML = tickerSuggestList.map(function(q, i) {
+    const sym = escapeHtml(String(q.symbol || '').toUpperCase());
+    const nm = escapeHtml(q.longname || q.shortname || '');
+    const ex = escapeHtml(q.exchDisp || q.exchange || '');
+    return '<button type="button" class="ticker-suggest-item' + (i === tickerSuggestIndex ? ' active' : '') + '" role="option" data-idx="' + i + '" onmousedown="event.preventDefault();selectTickerSuggest(parseInt(this.dataset.idx,10))">' +
+      '<span class="ticker-sug-sym">' + sym + '</span><span class="ticker-sug-name">' + nm + '</span>' +
+      (ex ? '<span class="ticker-sug-ex">' + ex + '</span>' : '') + '</button>';
+  }).join('');
+}
+
+function updateTickerSuggestHighlight() {
+  const box = document.getElementById('m-t-suggest');
+  if (!box || !box.classList.contains('open')) return;
+  box.querySelectorAll('.ticker-suggest-item').forEach(function(el, i) {
+    el.classList.toggle('active', i === tickerSuggestIndex);
+  });
+}
+
+function selectTickerSuggest(i) {
+  const q = tickerSuggestList[i];
+  if (!q) return;
+  const tEl = document.getElementById('m-t');
+  const nEl = document.getElementById('m-n');
+  if (tEl) tEl.value = String(q.symbol || '').toUpperCase();
+  if (nEl) {
+    nEl.value = q.longname || q.shortname || '';
+    nEl.dataset.autoFilled = '1';
+  }
+  cancelTickerSuggestHide();
+  hideTickerSuggest();
+  if (tEl) tEl.focus();
+}
+
+function tickerSuggestKeydown(ev) {
+  const box = document.getElementById('m-t-suggest');
+  const open = box && box.classList.contains('open') && tickerSuggestList.length > 0;
+  const panelOpen = box && box.classList.contains('open');
+  if (ev.key === 'ArrowDown' && open) {
+    ev.preventDefault();
+    if (tickerSuggestIndex < 0) tickerSuggestIndex = 0;
+    else tickerSuggestIndex = Math.min(tickerSuggestIndex + 1, tickerSuggestList.length - 1);
+    updateTickerSuggestHighlight();
+    return;
+  }
+  if (ev.key === 'ArrowUp' && open) {
+    ev.preventDefault();
+    if (tickerSuggestIndex <= 0) tickerSuggestIndex = -1;
+    else tickerSuggestIndex -= 1;
+    updateTickerSuggestHighlight();
+    return;
+  }
+  if (ev.key === 'Enter' && open) {
+    const idx = tickerSuggestIndex >= 0 ? tickerSuggestIndex : 0;
+    ev.preventDefault();
+    selectTickerSuggest(idx);
+    return;
+  }
+  if (ev.key === 'Escape' && panelOpen) {
+    ev.preventDefault();
+    hideTickerSuggest();
+  }
+}
+
+async function fetchTickerSuggest() {
+  const tEl = document.getElementById('m-t');
+  const box = document.getElementById('m-t-suggest');
+  if (!tEl || !box) return;
+  const qry = tEl.value.trim();
+  if (qry.length < 1) {
+    hideTickerSuggest();
+    return;
+  }
+  try {
+    const r = await fetch('https://query2.finance.yahoo.com/v1/finance/search?q=' + encodeURIComponent(qry) + '&quotesCount=18&newsCount=0');
+    if (!r.ok) return;
+    const j = await r.json();
+    let quotes = (j.quotes || []).filter(function(x) {
+      if (!x || !x.symbol) return false;
+      const qt = String(x.quoteType || x.type || '').toUpperCase();
+      if (qt === 'OPTION' || qt === 'CURRENCY' || qt === 'CRYPTOCURRENCY' || qt === 'INDEX') return false;
+      return true;
+    });
+    const seen = {};
+    quotes = quotes.filter(function(x) {
+      const k = x.symbol;
+      if (seen[k]) return false;
+      seen[k] = true;
+      return true;
+    });
+    const uq = qry.toUpperCase();
+    quotes.sort(function(a, b) {
+      function sc(q) {
+        const sym = String(q.symbol || '').toUpperCase();
+        if (sym === uq) return 0;
+        if (sym.startsWith(uq)) return 1;
+        const nm = String(q.shortname || q.longname || '').toUpperCase();
+        if (nm.indexOf(uq) !== -1) return 2;
+        return 3;
+      }
+      return sc(a) - sc(b);
+    });
+    if (tEl.value.trim() !== qry) return;
+    tickerSuggestList = quotes.slice(0, 12);
+    tickerSuggestIndex = -1;
+    if (!tickerSuggestList.length) {
+      box.innerHTML = '<div class="ticker-suggest-empty">No matches — try another spelling</div>';
+      box.classList.add('open');
+      return;
+    }
+    renderTickerSuggestItems();
+    box.classList.add('open');
+  } catch (e) {
+    hideTickerSuggest();
+  }
 }
 
 function markCompanyNameManual() {
@@ -548,7 +721,6 @@ function fetchCompanyNameForTicker() {
       if (!r2.ok) return;
       const j2 = await r2.json();
       const quotes = j2.quotes || [];
-      const symNorm = s => (s || '').toUpperCase().replace(/\.(TO|V|CN)$/,'').split('.')[0];
       const q = quotes.find(x => symNorm(x.symbol) === ticker) || quotes[0];
       const name = q && (q.longname || q.shortname);
       if (name && document.getElementById('m-t').value.trim().toUpperCase() === ticker) {
@@ -601,6 +773,8 @@ function updateLotsSummary() {
 }
 
 function resetAddModalForm() {
+  hideTickerSuggest();
+  cancelTickerSuggestHide();
   ['m-t','m-n'].forEach(id => { const e = document.getElementById(id); if (e) { e.value = ''; delete e.dataset.autoFilled; } });
   const wrap = document.getElementById('m-lot-rows');
   if (wrap) {
