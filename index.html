@@ -210,7 +210,7 @@ body::before {
 .ticker-sug-sym { font-family:'DM Mono',monospace; font-weight:600; color:var(--cyan); font-size:14px; flex-shrink:0; }
 .ticker-sug-name { flex:1; min-width:120px; line-height:1.35; color:var(--text); }
 .ticker-sug-ex { font-size:10px; color:var(--muted); font-family:'DM Mono',monospace; width:100%; margin-top:2px; }
-.ticker-suggest-empty { padding:14px; font-size:12px; color:var(--muted); font-family:'DM Mono',monospace; text-align:center; }
+.ticker-suggest-empty { padding:14px; font-size:12px; color:#cbd5e1; font-family:'DM Mono',monospace; text-align:center; line-height:1.45; }
 
 /* ─── NEWS ─── */
 .news-card { background:linear-gradient(165deg,rgba(30,41,59,.45),rgba(15,23,42,.9)); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:12px; box-shadow:var(--shadow-sm); }
@@ -487,6 +487,41 @@ function canCallAnthropic() {
   if (isAnthropicDirectBlockedHere()) return !!getAnthropicProxyUrl();
   return !!getAnthropicProxyUrl() || getAnthropicKey().length > 20;
 }
+
+/** Yahoo Finance search: direct fetch works on some origins; GitHub Pages needs /api/yahoo-search on the same host as the Claude proxy. */
+function yahooSearchProxyUrl() {
+  const p = getAnthropicProxyUrl() || MT_DEFAULT_VERCEL_PROXY;
+  return p.replace(/\/api\/anthropic\/?$/i, '/api/yahoo-search');
+}
+async function yahooFinanceSearchJson(qry) {
+  const enc = encodeURIComponent(qry);
+  const direct = 'https://query2.finance.yahoo.com/v1/finance/search?q=' + enc + '&quotesCount=18&newsCount=0';
+  const prox = yahooSearchProxyUrl() + '?q=' + enc;
+  async function load(url) {
+    const r = await fetch(url);
+    const j = await r.json().catch(function() { return null; });
+    if (!r.ok) {
+      const msg = (j && j.error && (j.error.message || j.error)) || ('HTTP ' + r.status);
+      throw new Error(msg);
+    }
+    return j;
+  }
+  try {
+    const c = (localStorage.getItem('mt-yahoo-search-proxy') || '').trim().replace(/\/$/, '');
+    if (c.startsWith('http://') || c.startsWith('https://')) return await load(c + '?q=' + enc);
+  } catch (e0) { /* fall through */ }
+  if (typeof location !== 'undefined' && /\.vercel\.app$/i.test(location.hostname)) {
+    try { return await load(location.origin + '/api/yahoo-search?q=' + enc); } catch (e1) { /* continue */ }
+  }
+  if (isAnthropicDirectBlockedHere()) {
+    return await load(prox);
+  }
+  try {
+    return await load(direct);
+  } catch (e2) {
+    return await load(prox);
+  }
+}
 async function anthropicMessages(bodyObj) {
   const proxy = getAnthropicProxyUrl();
   if (isAnthropicDirectBlockedHere() && !proxy)
@@ -705,15 +740,7 @@ async function fetchTickerSuggest() {
   box.classList.add('open');
   flashTickerSuggestOpen();
   try {
-    const r = await fetch('https://query2.finance.yahoo.com/v1/finance/search?q=' + encodeURIComponent(qry) + '&quotesCount=18&newsCount=0');
-    if (reqId !== tickerSuggestReqId || tEl.value.trim() !== qry) return;
-    if (!r.ok) {
-      box.innerHTML = '<div class="ticker-suggest-empty">Symbol search failed (' + r.status + '). You can still type a ticker and tab away to load the name.</div>';
-      box.classList.add('open');
-      flashTickerSuggestOpen();
-      return;
-    }
-    const j = await r.json();
+    const j = await yahooFinanceSearchJson(qry);
     if (reqId !== tickerSuggestReqId || tEl.value.trim() !== qry) return;
     let quotes = (j.quotes || []).filter(function(x) {
       if (!x || !x.symbol) return false;
@@ -788,9 +815,7 @@ function fetchCompanyNameForTicker() {
       }
     } catch (e) { /* try search */ }
     try {
-      const r2 = await fetch('https://query2.finance.yahoo.com/v1/finance/search?q=' + encodeURIComponent(ticker) + '&quotesCount=8&newsCount=0');
-      if (!r2.ok) return;
-      const j2 = await r2.json();
+      const j2 = await yahooFinanceSearchJson(ticker);
       const quotes = j2.quotes || [];
       const q = quotes.find(x => symNorm(x.symbol) === ticker) || quotes[0];
       const name = q && (q.longname || q.shortname);
