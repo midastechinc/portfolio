@@ -493,6 +493,44 @@ function yahooSearchProxyUrl() {
 function pushYahooSearchUrlUnique(arr, u) {
   if (u && arr.indexOf(u) === -1) arr.push(u);
 }
+/** Alpha Vantage allows CORS * — works on GitHub Pages without Vercel. Demo key is rate-limited; optional localStorage mt-alphavantage-key. */
+function alphavantageQuotesFromJson(j) {
+  var bm = j && j.bestMatches;
+  if (!Array.isArray(bm) || !bm.length) return null;
+  return bm.map(function(m) {
+    var sym = m['1. symbol'] || m.symbol || '';
+    var name = m['2. name'] || '';
+    var region = m['4. region'] || '';
+    return {
+      symbol: sym,
+      shortname: name,
+      longname: name,
+      exchDisp: region,
+      exchange: region,
+      quoteType: 'EQUITY',
+      type: 'EQUITY'
+    };
+  });
+}
+async function tryAlphaVantageSymbolSearch(qry) {
+  var key = 'demo';
+  try {
+    var k = (localStorage.getItem('mt-alphavantage-key') || '').trim();
+    if (k.length >= 8) key = k;
+  } catch (e) {}
+  var url = 'https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=' + encodeURIComponent(qry) + '&apikey=' + encodeURIComponent(key);
+  try {
+    var r = await fetch(url);
+    var j = await r.json().catch(function() { return null; });
+    if (!r.ok || j == null) return { ok: false, err: 'Alpha Vantage HTTP ' + r.status };
+    if (j.Note || j.Information) return { ok: false, err: 'Alpha Vantage busy (demo limit) — add key: localStorage mt-alphavantage-key' };
+    var quotes = alphavantageQuotesFromJson(j);
+    if (!quotes) return { ok: false, err: 'No symbol matches' };
+    return { ok: true, j: { quotes: quotes } };
+  } catch (ex) {
+    return { ok: false, err: ex.message || 'Alpha Vantage failed' };
+  }
+}
 async function yahooFinanceSearchJson(qry) {
   const enc = encodeURIComponent(qry);
   const suf = 'quotesCount=18&newsCount=0';
@@ -525,13 +563,31 @@ async function yahooFinanceSearchJson(qry) {
     }
   }
   var blocked = isAnthropicDirectBlockedHere();
-  var order = blocked ? proxyUrls.slice() : directUrls.concat(proxyUrls);
-  var lastErr = 'All symbol search routes failed — redeploy Vercel with api/yahoo-search.js';
+  var lastErr = 'Symbol search unavailable';
+  if (blocked) {
+    var parallel = [tryAlphaVantageSymbolSearch(qry)].concat(proxyUrls.map(function(u) { return tryLoad(u); }));
+    var settled = await Promise.allSettled(parallel);
+    for (var pi = 0; pi < settled.length; pi++) {
+      if (settled[pi].status !== 'fulfilled') {
+        var reason = settled[pi].reason;
+        if (reason && reason.message) lastErr = reason.message;
+        continue;
+      }
+      var pt = settled[pi].value;
+      if (pt.ok) return pt.j;
+      lastErr = pt.err || lastErr;
+    }
+    throw new Error(lastErr);
+  }
+  var order = directUrls.concat(proxyUrls);
   for (var i = 0; i < order.length; i++) {
     var t = await tryLoad(order[i]);
     if (t.ok) return t.j;
     lastErr = t.err || lastErr;
   }
+  var av2 = await tryAlphaVantageSymbolSearch(qry);
+  if (av2.ok) return av2.j;
+  lastErr = av2.err || lastErr;
   throw new Error(lastErr);
 }
 async function anthropicMessages(bodyObj) {
@@ -795,7 +851,7 @@ async function fetchTickerSuggest() {
     const detail = e && e.message ? escapeHtml(e.message) : '';
     box.innerHTML = '<div class="ticker-suggest-empty"><strong>Symbol search failed.</strong>' +
       (detail ? '<br><span style="opacity:.9">' + detail + '</span>' : '') +
-      '<br><span style="opacity:.85;margin-top:8px;display:inline-block">On GitHub Pages: merge/deploy <code style="color:var(--cyan)">api/yahoo-search.js</code> on Vercel. Or run:<br><code style="color:var(--cyan);font-size:11px;word-break:break-all">localStorage.setItem(&quot;mt-yahoo-search-proxy&quot;,&quot;https://YOUR.vercel.app/api/yahoo-search&quot;)</code></span><br>You can still type a ticker and tab away to fill the name.</div>';
+      '<br><span style="opacity:.85;margin-top:8px;display:inline-block"><strong>Fix:</strong> In Vercel → Env → <code style="color:var(--cyan)">ALPHA_VANTAGE_KEY</code> (free at alphavantage.co), redeploy. Or in the browser:<br><code style="color:var(--cyan);font-size:11px;word-break:break-all">localStorage.setItem(&quot;mt-alphavantage-key&quot;,&quot;YOUR_KEY&quot;)</code></span><br>You can still type a ticker and tab away to fill the name.</div>';
     box.classList.add('open');
     flashTickerSuggestOpen();
   }

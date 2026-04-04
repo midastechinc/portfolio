@@ -1,6 +1,6 @@
 /**
  * Vercel proxy for Yahoo Finance symbol search (browser CORS blocks github.io → Yahoo).
- * No secrets required. Deploy with the rest of api/*.
+ * Optional: set env ALPHA_VANTAGE_KEY (free key from alphavantage.co) — used if Yahoo blocks the server.
  * CORS: same defaults as api/anthropic.js (open * unless CORS_STRICT=1 + ALLOW_ORIGIN).
  */
 
@@ -81,6 +81,35 @@ module.exports = async (req, res) => {
       lastStatus = r.status;
       lastBody = data && typeof data === 'object' ? data : { error: { message: 'HTTP ' + r.status } };
     }
+    const avKey = (process.env.ALPHA_VANTAGE_KEY || '').trim();
+    if (avKey.length >= 8) {
+      try {
+        const avUrl =
+          'https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=' +
+          encodeURIComponent(q) +
+          '&apikey=' +
+          encodeURIComponent(avKey);
+        const ar = await fetch(avUrl);
+        const aj = await ar.json().catch(() => null);
+        const bm = aj && aj.bestMatches;
+        if (ar.ok && Array.isArray(bm) && bm.length) {
+          const quotes = bm.map((m) => ({
+            symbol: m['1. symbol'] || m.symbol,
+            shortname: m['2. name'] || '',
+            longname: m['2. name'] || '',
+            exchDisp: m['4. region'] || '',
+            exchange: m['4. region'] || '',
+            quoteType: 'EQUITY',
+            type: 'EQUITY',
+          }));
+          res.status(200).json({ quotes });
+          return;
+        }
+      } catch (avErr) {
+        lastBody = { error: { message: avErr.message || 'Alpha Vantage fallback failed' } };
+      }
+    }
+
     res.status(lastStatus >= 400 ? lastStatus : 502).json(lastBody);
   } catch (e) {
     res.status(502).json({ error: { message: e.message || 'Upstream fetch failed' } });
