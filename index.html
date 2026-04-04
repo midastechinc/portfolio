@@ -476,10 +476,7 @@ function getAnthropicProxyUrl() {
     if (u.startsWith('http://') || u.startsWith('https://')) return u;
     if (typeof location !== 'undefined' && /\.vercel\.app$/i.test(location.hostname))
       return location.origin + '/api/anthropic';
-    if (isAnthropicDirectBlockedHere()) {
-      const p = location.pathname || '';
-      if (p.indexOf('portfolio') !== -1) return MT_DEFAULT_VERCEL_PROXY;
-    }
+    if (isAnthropicDirectBlockedHere()) return MT_DEFAULT_VERCEL_PROXY;
     return '';
   } catch (e) { return ''; }
 }
@@ -488,39 +485,54 @@ function canCallAnthropic() {
   return !!getAnthropicProxyUrl() || getAnthropicKey().length > 20;
 }
 
-/** Yahoo Finance search: direct fetch works on some origins; GitHub Pages needs /api/yahoo-search on the same host as the Claude proxy. */
+/** Yahoo Finance search: GitHub Pages uses /api/yahoo-search on Vercel (same project as Claude). */
 function yahooSearchProxyUrl() {
   const p = getAnthropicProxyUrl() || MT_DEFAULT_VERCEL_PROXY;
   return p.replace(/\/api\/anthropic\/?$/i, '/api/yahoo-search');
 }
+function pushYahooSearchUrlUnique(arr, u) {
+  if (u && arr.indexOf(u) === -1) arr.push(u);
+}
 async function yahooFinanceSearchJson(qry) {
   const enc = encodeURIComponent(qry);
-  const direct = 'https://query2.finance.yahoo.com/v1/finance/search?q=' + enc + '&quotesCount=18&newsCount=0';
-  const prox = yahooSearchProxyUrl() + '?q=' + enc;
-  async function load(url) {
-    const r = await fetch(url);
-    const j = await r.json().catch(function() { return null; });
-    if (!r.ok) {
-      const msg = (j && j.error && (j.error.message || j.error)) || ('HTTP ' + r.status);
-      throw new Error(msg);
-    }
-    return j;
-  }
+  const suf = 'quotesCount=18&newsCount=0';
+  const directUrls = [
+    'https://query2.finance.yahoo.com/v1/finance/search?q=' + enc + '&' + suf,
+    'https://query1.finance.yahoo.com/v1/finance/search?q=' + enc + '&' + suf
+  ];
+  const proxyUrls = [];
   try {
     const c = (localStorage.getItem('mt-yahoo-search-proxy') || '').trim().replace(/\/$/, '');
-    if (c.startsWith('http://') || c.startsWith('https://')) return await load(c + '?q=' + enc);
-  } catch (e0) { /* fall through */ }
+    if (c.startsWith('http://') || c.startsWith('https://')) pushYahooSearchUrlUnique(proxyUrls, c + '?q=' + enc);
+  } catch (e) {}
+  pushYahooSearchUrlUnique(proxyUrls, MT_DEFAULT_VERCEL_PROXY.replace(/\/api\/anthropic\/?$/i, '/api/yahoo-search') + '?q=' + enc);
+  pushYahooSearchUrlUnique(proxyUrls, yahooSearchProxyUrl() + '?q=' + enc);
   if (typeof location !== 'undefined' && /\.vercel\.app$/i.test(location.hostname)) {
-    try { return await load(location.origin + '/api/yahoo-search?q=' + enc); } catch (e1) { /* continue */ }
+    pushYahooSearchUrlUnique(proxyUrls, location.origin + '/api/yahoo-search?q=' + enc);
   }
-  if (isAnthropicDirectBlockedHere()) {
-    return await load(prox);
+  async function tryLoad(url) {
+    try {
+      const r = await fetch(url);
+      const j = await r.json().catch(function() { return null; });
+      if (!r.ok) {
+        const msg = (j && j.error && (j.error.message || j.error)) || ('HTTP ' + r.status);
+        return { ok: false, err: String(msg) };
+      }
+      if (j == null || typeof j !== 'object') return { ok: false, err: 'Invalid JSON from search' };
+      return { ok: true, j: j };
+    } catch (ex) {
+      return { ok: false, err: ex.message || 'Failed to fetch' };
+    }
   }
-  try {
-    return await load(direct);
-  } catch (e2) {
-    return await load(prox);
+  var blocked = isAnthropicDirectBlockedHere();
+  var order = blocked ? proxyUrls.slice() : directUrls.concat(proxyUrls);
+  var lastErr = 'All symbol search routes failed — redeploy Vercel with api/yahoo-search.js';
+  for (var i = 0; i < order.length; i++) {
+    var t = await tryLoad(order[i]);
+    if (t.ok) return t.j;
+    lastErr = t.err || lastErr;
   }
+  throw new Error(lastErr);
 }
 async function anthropicMessages(bodyObj) {
   const proxy = getAnthropicProxyUrl();
@@ -780,7 +792,10 @@ async function fetchTickerSuggest() {
     renderTickerSuggestItems();
   } catch (e) {
     if (reqId !== tickerSuggestReqId || tEl.value.trim() !== qry) return;
-    box.innerHTML = '<div class="ticker-suggest-empty">Could not reach symbol search (network or blocker). Enter a ticker and tab away to fill the name.</div>';
+    const detail = e && e.message ? escapeHtml(e.message) : '';
+    box.innerHTML = '<div class="ticker-suggest-empty"><strong>Symbol search failed.</strong>' +
+      (detail ? '<br><span style="opacity:.9">' + detail + '</span>' : '') +
+      '<br><span style="opacity:.85;margin-top:8px;display:inline-block">On GitHub Pages: merge/deploy <code style="color:var(--cyan)">api/yahoo-search.js</code> on Vercel. Or run:<br><code style="color:var(--cyan);font-size:11px;word-break:break-all">localStorage.setItem(&quot;mt-yahoo-search-proxy&quot;,&quot;https://YOUR.vercel.app/api/yahoo-search&quot;)</code></span><br>You can still type a ticker and tab away to fill the name.</div>';
     box.classList.add('open');
     flashTickerSuggestOpen();
   }

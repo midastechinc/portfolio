@@ -30,27 +30,58 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const raw = (req.query && req.query.q) != null ? String(req.query.q) : '';
+  let raw = (req.query && req.query.q) != null ? String(req.query.q) : '';
+  if (!raw && req.url) {
+    try {
+      const u = new URL(req.url, 'http://localhost');
+      raw = u.searchParams.get('q') || '';
+    } catch (e) {
+      raw = '';
+    }
+  }
   const q = raw.trim();
   if (!q || q.length > 80) {
     res.status(400).json({ error: { message: 'Missing or invalid q' } });
     return;
   }
 
-  const yUrl =
-    'https://query2.finance.yahoo.com/v1/finance/search?q=' +
-    encodeURIComponent(q) +
-    '&quotesCount=18&newsCount=0';
+  const qEnc = encodeURIComponent(q);
+  const suffix = 'quotesCount=18&newsCount=0';
+  const candidates = [
+    `https://query2.finance.yahoo.com/v1/finance/search?q=${qEnc}&${suffix}`,
+    `https://query1.finance.yahoo.com/v1/finance/search?q=${qEnc}&${suffix}`,
+  ];
+
+  const headers = {
+    'User-Agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    Accept: 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    Referer: 'https://finance.yahoo.com/',
+  };
 
   try {
-    const r = await fetch(yUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; MidasPortfolio/1.0)',
-        Accept: 'application/json',
-      },
-    });
-    const data = await r.json().catch(() => ({}));
-    res.status(r.status).json(data);
+    let lastStatus = 502;
+    let lastBody = { error: { message: 'Yahoo search returned no usable JSON' } };
+    for (let i = 0; i < candidates.length; i++) {
+      const r = await fetch(candidates[i], { headers });
+      const text = await r.text();
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch (pe) {
+        lastStatus = r.status || 502;
+        lastBody = { error: { message: 'Yahoo returned non-JSON (blocked or rate-limited)' } };
+        continue;
+      }
+      if (r.ok && data && typeof data === 'object') {
+        res.status(200).json(data);
+        return;
+      }
+      lastStatus = r.status;
+      lastBody = data && typeof data === 'object' ? data : { error: { message: 'HTTP ' + r.status } };
+    }
+    res.status(lastStatus >= 400 ? lastStatus : 502).json(lastBody);
   } catch (e) {
     res.status(502).json({ error: { message: e.message || 'Upstream fetch failed' } });
   }
