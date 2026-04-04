@@ -192,10 +192,11 @@ body::before {
 .lots-summary { font-size:12px; color:var(--cyan); font-family:'DM Mono',monospace; margin-bottom:6px; min-height:18px; }
 .name-hint { font-size:11px; color:var(--muted); font-family:'DM Mono',monospace; margin-top:6px; line-height:1.4; }
 .field-ticker-wrap { position:relative; z-index:2; }
+/* Panel is moved under <body> and position:fixed — modal-sheet uses transform+overflow which clips absolute children */
 .ticker-suggest {
-  display:none; position:absolute; left:0; right:0; top:calc(100% + 4px); max-height:min(240px,42vh); overflow-y:auto;
+  display:none; position:fixed; left:0; top:0; width:min(100vw - 24px, 420px); max-height:min(240px,42vh); overflow-y:auto;
   background:linear-gradient(180deg,#1e293b,#0f172a); border:1px solid var(--border2); border-radius:12px;
-  box-shadow:0 16px 48px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.04); z-index:60;
+  box-shadow:0 16px 48px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.04); z-index:10050;
   -webkit-overflow-scrolling:touch;
 }
 .ticker-suggest.open { display:block; }
@@ -384,7 +385,7 @@ body::before {
     <div class="modal-handle"></div>
     <div class="modal-title">Add Holding</div>
     <div class="modal-body">
-      <div class="field field-ticker-wrap"><label>Symbol or company</label><input type="text" id="m-t" placeholder="e.g. AAPL or Apple" style="text-transform:uppercase" autocomplete="off" autocorrect="off" spellcheck="false" oninput="scheduleTickerSuggest()" onfocus="scheduleTickerSuggest()" onkeydown="tickerSuggestKeydown(event)" onblur="handleTickerFieldBlur()"><div id="m-t-suggest" class="ticker-suggest" role="listbox" aria-label="Matching symbols" onmouseenter="cancelTickerSuggestHide()" onmouseleave="scheduleHideTickerSuggestOnBlur()"></div></div>
+      <div class="field field-ticker-wrap"><label>Symbol or company</label><input type="text" id="m-t" placeholder="e.g. AAPL or Apple" style="text-transform:uppercase" autocomplete="off" autocorrect="off" spellcheck="false" oninput="scheduleTickerSuggest()" onfocus="scheduleTickerSuggest()" onkeydown="tickerSuggestKeydown(event)" onblur="handleTickerFieldBlur()"></div>
       <div class="field"><label>Company Name</label><input type="text" id="m-n" placeholder="Choose from list above or type" autocomplete="off" oninput="markCompanyNameManual()"><div class="name-hint">Pick a match from the dropdown, or enter a symbol and tab away — name comes from Yahoo Finance.</div></div>
       <div class="lots-wrap">
         <span class="lots-label">Purchase lots</span>
@@ -433,6 +434,7 @@ body::before {
   </div>
 </div>
 
+<div id="m-t-suggest" class="ticker-suggest" role="listbox" aria-label="Matching symbols" onmouseenter="cancelTickerSuggestHide()" onmouseleave="scheduleHideTickerSuggestOnBlur()"></div>
 <div id="toast"></div>
 
 <script>
@@ -542,12 +544,64 @@ let tickerSuggestTimer = null;
 let tickerSuggestHideTimer = null;
 let tickerSuggestList = [];
 let tickerSuggestIndex = -1;
+let tickerSuggestReqId = 0;
 
 function hideTickerSuggest() {
   const box = document.getElementById('m-t-suggest');
-  if (box) { box.classList.remove('open'); box.innerHTML = ''; }
+  if (box) {
+    box.classList.remove('open');
+    box.innerHTML = '';
+    box.style.left = '';
+    box.style.top = '';
+    box.style.width = '';
+    box.style.maxHeight = '';
+  }
   tickerSuggestIndex = -1;
   tickerSuggestList = [];
+}
+
+function positionTickerSuggestDropdown() {
+  const input = document.getElementById('m-t');
+  const box = document.getElementById('m-t-suggest');
+  if (!input || !box || !box.classList.contains('open')) return;
+  const r = input.getBoundingClientRect();
+  const gap = 5;
+  let left = Math.round(r.left);
+  let w = Math.max(Math.round(r.width), 160);
+  let top = Math.round(r.bottom + gap);
+  if (left + w > window.innerWidth - 12) left = Math.max(12, window.innerWidth - w - 12);
+  if (left < 12) left = 12;
+  box.style.left = left + 'px';
+  box.style.width = w + 'px';
+  box.style.top = top + 'px';
+  const maxH = Math.min(240, window.innerHeight - top - 16);
+  box.style.maxHeight = Math.max(100, maxH) + 'px';
+}
+
+function onTickerSuggestReposition() {
+  const box = document.getElementById('m-t-suggest');
+  if (box && box.classList.contains('open')) positionTickerSuggestDropdown();
+}
+
+let tickerSuggestRepositionBound = false;
+function ensureTickerSuggestRepositionListeners() {
+  if (tickerSuggestRepositionBound) return;
+  tickerSuggestRepositionBound = true;
+  window.addEventListener('scroll', onTickerSuggestReposition, true);
+  window.addEventListener('resize', onTickerSuggestReposition);
+  const addModal = document.getElementById('addModal');
+  if (addModal) {
+    const sheet = addModal.querySelector('.modal-sheet');
+    if (sheet) sheet.addEventListener('scroll', onTickerSuggestReposition, { passive: true });
+  }
+}
+
+function flashTickerSuggestOpen() {
+  positionTickerSuggestDropdown();
+  requestAnimationFrame(function() {
+    positionTickerSuggestDropdown();
+    requestAnimationFrame(positionTickerSuggestDropdown);
+  });
 }
 
 function cancelTickerSuggestHide() {
@@ -580,6 +634,7 @@ function renderTickerSuggestItems() {
       '<span class="ticker-sug-sym">' + sym + '</span><span class="ticker-sug-name">' + nm + '</span>' +
       (ex ? '<span class="ticker-sug-ex">' + ex + '</span>' : '') + '</button>';
   }).join('');
+  flashTickerSuggestOpen();
 }
 
 function updateTickerSuggestHighlight() {
@@ -644,10 +699,22 @@ async function fetchTickerSuggest() {
     hideTickerSuggest();
     return;
   }
+  ensureTickerSuggestRepositionListeners();
+  const reqId = ++tickerSuggestReqId;
+  box.innerHTML = '<div class="ticker-suggest-empty">Searching…</div>';
+  box.classList.add('open');
+  flashTickerSuggestOpen();
   try {
     const r = await fetch('https://query2.finance.yahoo.com/v1/finance/search?q=' + encodeURIComponent(qry) + '&quotesCount=18&newsCount=0');
-    if (!r.ok) return;
+    if (reqId !== tickerSuggestReqId || tEl.value.trim() !== qry) return;
+    if (!r.ok) {
+      box.innerHTML = '<div class="ticker-suggest-empty">Symbol search failed (' + r.status + '). You can still type a ticker and tab away to load the name.</div>';
+      box.classList.add('open');
+      flashTickerSuggestOpen();
+      return;
+    }
     const j = await r.json();
+    if (reqId !== tickerSuggestReqId || tEl.value.trim() !== qry) return;
     let quotes = (j.quotes || []).filter(function(x) {
       if (!x || !x.symbol) return false;
       const qt = String(x.quoteType || x.type || '').toUpperCase();
@@ -673,18 +740,22 @@ async function fetchTickerSuggest() {
       }
       return sc(a) - sc(b);
     });
-    if (tEl.value.trim() !== qry) return;
+    if (reqId !== tickerSuggestReqId || tEl.value.trim() !== qry) return;
     tickerSuggestList = quotes.slice(0, 12);
     tickerSuggestIndex = -1;
     if (!tickerSuggestList.length) {
       box.innerHTML = '<div class="ticker-suggest-empty">No matches — try another spelling</div>';
       box.classList.add('open');
+      flashTickerSuggestOpen();
       return;
     }
-    renderTickerSuggestItems();
     box.classList.add('open');
+    renderTickerSuggestItems();
   } catch (e) {
-    hideTickerSuggest();
+    if (reqId !== tickerSuggestReqId || tEl.value.trim() !== qry) return;
+    box.innerHTML = '<div class="ticker-suggest-empty">Could not reach symbol search (network or blocker). Enter a ticker and tab away to fill the name.</div>';
+    box.classList.add('open');
+    flashTickerSuggestOpen();
   }
 }
 
@@ -1178,8 +1249,15 @@ function goToAdvice() {
 
 // ─── Modals ──────────────────────────────────────────────
 function openAdd() { resetAddModalForm(); document.getElementById('addModal').classList.add('open'); setTimeout(()=>document.getElementById('m-t').focus(),350); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); }
-function bgClose(e) { if(e.target===e.currentTarget) e.currentTarget.classList.remove('open'); }
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  if (id === 'addModal') { cancelTickerSuggestHide(); hideTickerSuggest(); }
+}
+function bgClose(e) {
+  if (e.target !== e.currentTarget) return;
+  e.currentTarget.classList.remove('open');
+  if (e.currentTarget.id === 'addModal') { cancelTickerSuggestHide(); hideTickerSuggest(); }
+}
 
 // ─── News ────────────────────────────────────────────────
 async function fetchNews() {
