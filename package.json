@@ -1,0 +1,7 @@
+{
+  "name": "midas-portfolio",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  }
+}

@@ -143,6 +143,15 @@ body::before {
 .field input { width:100%; background:var(--s3); border:1px solid var(--border2); color:var(--text); padding:13px 15px; border-radius:12px; font-size:16px; font-family:'DM Mono',monospace; outline:none; -webkit-appearance:none; transition:border-color .2s; }
 .field input:focus { border-color:var(--cyan); }
 .field input::placeholder { color:var(--muted); font-size:14px; }
+.lots-wrap { margin-bottom:14px; }
+.lots-label { display:block; font-size:10px; color:var(--muted); margin-bottom:8px; font-family:'DM Mono',monospace; letter-spacing:.8px; text-transform:uppercase; }
+.lot-row { display:grid; grid-template-columns:1fr 1fr 38px; gap:8px; align-items:center; margin-bottom:8px; }
+.lot-row input { width:100%; background:var(--s3); border:1px solid var(--border2); color:var(--text); padding:11px 12px; border-radius:10px; font-size:15px; font-family:'DM Mono',monospace; outline:none; -webkit-appearance:none; transition:border-color .2s; }
+.lot-row input:focus { border-color:var(--cyan); }
+.btn-lot-rm { width:38px; height:42px; border-radius:10px; border:1px solid var(--border); background:var(--s3); color:var(--muted); font-size:20px; line-height:1; cursor:pointer; flex-shrink:0; }
+.btn-lot-rm:active { transform:scale(.92); }
+.lots-summary { font-size:12px; color:var(--cyan); font-family:'DM Mono',monospace; margin-bottom:6px; min-height:18px; }
+.name-hint { font-size:11px; color:var(--muted); font-family:'DM Mono',monospace; margin-top:6px; line-height:1.4; }
 
 /* ─── NEWS ─── */
 .news-card { background:var(--s1); border:1px solid var(--border); border-radius:14px; padding:14px; margin-bottom:10px; }
@@ -164,6 +173,20 @@ body::before {
 .kup { flex:1; background:var(--gdim); border-radius:10px; padding:8px 10px; font-size:12px; color:var(--green); line-height:1.4; }
 .kdn { flex:1; background:var(--rdim); border-radius:10px; padding:8px 10px; font-size:12px; color:var(--red); line-height:1.4; }
 .aconf { font-size:11px; color:var(--muted); font-family:'DM Mono',monospace; }
+.fund-banner { background:rgba(0,114,188,.12); border:1px solid rgba(0,174,239,.22); border-radius:12px; padding:12px 14px; font-size:11px; color:var(--muted); font-family:'DM Mono',monospace; line-height:1.55; margin-bottom:14px; }
+.fund-banner strong { color:var(--cyan); font-weight:600; }
+.vblock { background:var(--s3); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-top:12px; }
+.vblock-title { font-size:10px; color:var(--cyan); font-family:'DM Mono',monospace; letter-spacing:.6px; text-transform:uppercase; margin-bottom:10px; }
+.vrow { display:flex; justify-content:space-between; gap:10px; font-size:12px; font-family:'DM Mono',monospace; margin-bottom:7px; color:var(--text); }
+.vrow span:first-child { color:var(--muted); flex-shrink:0; }
+.vrow span:last-child { text-align:right; line-height:1.35; }
+.vpara { font-size:12px; color:#c8d2e0; line-height:1.5; margin-top:8px; }
+.check-grid { display:grid; gap:8px; margin-top:8px; }
+.check-item { font-size:11px; font-family:'DM Mono',monospace; padding:8px 10px; border-radius:8px; background:rgba(107,122,148,.12); border:1px solid var(--border); line-height:1.4; }
+.check-item.pass { border-color:rgba(0,229,160,.25); background:var(--gdim); color:var(--green); }
+.check-item.fail { border-color:rgba(255,77,106,.25); background:var(--rdim); color:var(--red); }
+.check-item.watch { border-color:rgba(240,192,64,.35); background:rgba(240,192,64,.08); color:var(--gold); }
+.sum-verdict { font-size:13px; color:var(--text); line-height:1.55; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); }
 
 /* ─── ALLOCATION ─── */
 .alloc-row { display:flex; align-items:center; gap:10px; margin-bottom:10px; }
@@ -242,7 +265,7 @@ body::before {
       </div>
       <div class="sec-hdr">
         <div class="sec-title">📊 Holdings</div>
-        <button class="btn btn-ai btn-sm" onclick="runAIAll()">🤖 AI All</button>
+        <button type="button" class="btn btn-ai btn-sm" onclick="runAIAll()">🤖 AI All</button>
       </div>
       <div id="holdingsWrap">
         <div class="empty"><div class="empty-icon">📈</div><div class="empty-text">Tap <strong>+</strong> to add your first holding</div></div>
@@ -257,7 +280,7 @@ body::before {
     <div class="page" id="pg-news">
       <div class="sec-hdr">
         <div class="sec-title">📰 Market News</div>
-        <button class="btn btn-refresh btn-sm" onclick="fetchNews()">⟳ Refresh</button>
+        <button type="button" class="btn btn-refresh btn-sm" onclick="fetchNews()">⟳ Refresh</button>
       </div>
       <div id="newsWrap">
         <div class="empty"><div class="empty-icon">📰</div><div class="empty-text">Add holdings first,<br>then tap Refresh for news</div></div>
@@ -268,9 +291,9 @@ body::before {
     <div class="page" id="pg-advice">
       <div class="sec-hdr">
         <div class="sec-title">🤖 AI Recommendations</div>
-        <button class="btn btn-ai btn-sm" onclick="runAIAll()">Run All</button>
+        <button type="button" class="btn btn-ai btn-sm" onclick="runAIAll()">Run All</button>
       </div>
-      <div class="disclaimer">⚠️ AI analysis only — not financial advice. Consult a licensed advisor.</div>
+      <div class="disclaimer">⚠️ AI fundamental-style analysis only — not financial advice. Models use estimated web data; consult a licensed advisor.</div>
       <div id="adviceWrap">
         <div class="empty"><div class="empty-icon">🤖</div><div class="empty-text">Tap "AI All" or 🤖 on any holding</div></div>
       </div>
@@ -280,13 +303,13 @@ body::before {
   <button id="fab" onclick="openAdd()">+</button>
 
   <div id="nav">
-    <button class="nav-item active" onclick="goPage('portfolio',this)">
+    <button type="button" class="nav-item active" onclick="goPage('portfolio',this)">
       <span class="nav-icon">📊</span><span class="nav-label">PORTFOLIO</span>
     </button>
-    <button class="nav-item" onclick="goPage('news',this)">
+    <button type="button" class="nav-item" onclick="goPage('news',this)">
       <span class="nav-icon">📰</span><span class="nav-label">NEWS</span>
     </button>
-    <button class="nav-item" onclick="goPage('advice',this)">
+    <button type="button" class="nav-item" id="nav-advice" onclick="goPage('advice',this)">
       <span class="nav-icon">🤖</span><span class="nav-label">AI ADVICE</span>
     </button>
   </div>
@@ -298,12 +321,22 @@ body::before {
     <div class="modal-handle"></div>
     <div class="modal-title">Add Holding</div>
     <div class="modal-body">
-      <div class="field"><label>Ticker Symbol</label><input type="text" id="m-t" placeholder="e.g. AAPL" style="text-transform:uppercase" autocomplete="off" autocorrect="off" spellcheck="false"></div>
-      <div class="field"><label>Company Name</label><input type="text" id="m-n" placeholder="e.g. Apple Inc." autocomplete="off"></div>
-      <div class="field"><label>Number of Shares</label><input type="number" id="m-s" placeholder="e.g. 10" min="0.001" step="any" inputmode="decimal"></div>
-      <div class="field" style="margin-bottom:20px"><label>Average Buy Price ($)</label><input type="number" id="m-c" placeholder="e.g. 150.00" min="0.01" step="any" inputmode="decimal"></div>
-      <button class="btn btn-primary btn-full" onclick="addHolding()" style="margin-bottom:10px">Add Holding</button>
-      <button class="btn btn-ghost btn-full" onclick="closeModal('addModal')" style="margin-bottom:8px">Cancel</button>
+      <div class="field"><label>Ticker Symbol</label><input type="text" id="m-t" placeholder="e.g. AAPL" style="text-transform:uppercase" autocomplete="off" autocorrect="off" spellcheck="false" onblur="scheduleTickerNameLookup()"></div>
+      <div class="field"><label>Company Name</label><input type="text" id="m-n" placeholder="Fills when you leave the ticker field" autocomplete="off" oninput="markCompanyNameManual()"><div class="name-hint">Editable — we look up the name from your symbol (Yahoo Finance).</div></div>
+      <div class="lots-wrap">
+        <span class="lots-label">Purchase lots</span>
+        <div id="m-lot-rows">
+          <div class="lot-row">
+            <input class="m-lot-shares" type="number" placeholder="Shares" min="0.001" step="any" inputmode="decimal" oninput="updateLotsSummary()">
+            <input class="m-lot-price" type="number" placeholder="Price ($)" min="0.01" step="any" inputmode="decimal" oninput="updateLotsSummary()">
+            <button type="button" class="btn-lot-rm" onclick="removeLotRow(this)" title="Remove" style="visibility:hidden" aria-label="Remove row">−</button>
+          </div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addLotRow()" style="width:100%;margin-bottom:10px;font-size:12px">+ Add another purchase (different price)</button>
+        <div class="lots-summary" id="m-lots-summary">Total: — shares · Avg cost: —</div>
+      </div>
+      <button type="button" class="btn btn-primary btn-full" onclick="addHolding()" style="margin-bottom:10px">Add Holding</button>
+      <button type="button" class="btn btn-ghost btn-full" onclick="closeModal('addModal')" style="margin-bottom:8px">Cancel</button>
     </div>
   </div>
 </div>
@@ -330,6 +363,186 @@ let currentUser = null;
 // ─── Helpers ─────────────────────────────────────────────
 const fmtC = n => (n === null || n === undefined || isNaN(n)) ? '$—' : '$' + Math.abs(n).toLocaleString('en-CA',{minimumFractionDigits:2,maximumFractionDigits:2});
 
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function getAnthropicKey() {
+  try { return localStorage.getItem('mt-anthropic-key') || ''; } catch (e) { return ''; }
+}
+/** Vercel proxy for GitHub Pages (key lives on Vercel only). Change if your Vercel URL changes. */
+const MT_DEFAULT_VERCEL_PROXY = 'https://portfolio-lake-delta-uzgpfwpwmx.vercel.app/api/anthropic';
+function isAnthropicDirectBlockedHere() {
+  try {
+    if (typeof location === 'undefined') return false;
+    if (location.protocol === 'file:') return true;
+    return /\.github\.io$/i.test(location.hostname);
+  } catch (e) { return false; }
+}
+function getAnthropicProxyUrl() {
+  try {
+    const u = (localStorage.getItem('mt-anthropic-proxy') || '').trim().replace(/\/$/, '');
+    if (u.startsWith('http://') || u.startsWith('https://')) return u;
+    if (typeof location !== 'undefined' && /\.vercel\.app$/i.test(location.hostname))
+      return location.origin + '/api/anthropic';
+    if (isAnthropicDirectBlockedHere()) {
+      const p = location.pathname || '';
+      if (p.indexOf('portfolio') !== -1) return MT_DEFAULT_VERCEL_PROXY;
+    }
+    return '';
+  } catch (e) { return ''; }
+}
+function canCallAnthropic() {
+  if (isAnthropicDirectBlockedHere()) return !!getAnthropicProxyUrl();
+  return !!getAnthropicProxyUrl() || getAnthropicKey().length > 20;
+}
+async function anthropicMessages(bodyObj) {
+  const proxy = getAnthropicProxyUrl();
+  if (isAnthropicDirectBlockedHere() && !proxy)
+    throw new Error('Proxy required on GitHub Pages — push latest index.html or set localStorage mt-anthropic-proxy');
+  const url = proxy || 'https://api.anthropic.com/v1/messages';
+  const h = {'Content-Type':'application/json','anthropic-version':'2023-06-01'};
+  if (!proxy) {
+    const k = getAnthropicKey();
+    if (k.length < 21) throw new Error('Missing API key — set mt-anthropic-key or mt-anthropic-proxy');
+    h['x-api-key'] = k;
+  }
+  return fetch(url, {method:'POST', headers:h, body:JSON.stringify(bodyObj)});
+}
+
+function normalizeHoldingLots(h) {
+  if (!h.lots || !h.lots.length) {
+    const sh = Number(h.shares), c = Number(h.cost);
+    h.lots = (!isNaN(sh) && !isNaN(c) && sh > 0 && c > 0) ? [{ shares: sh, price: c }] : [];
+  } else {
+    h.lots = h.lots.map(l => ({ shares: Number(l.shares), price: Number(l.price != null ? l.price : l.pricePerShare) }))
+      .filter(l => !isNaN(l.shares) && !isNaN(l.price) && l.shares > 0 && l.price > 0);
+    if (!h.lots.length) {
+      const sh = Number(h.shares), c = Number(h.cost);
+      if (!isNaN(sh) && !isNaN(c) && sh > 0 && c > 0) h.lots = [{ shares: sh, price: c }];
+    }
+  }
+  const ts = h.lots.reduce((a, l) => a + l.shares, 0);
+  if (ts > 0) {
+    const basis = h.lots.reduce((a, l) => a + l.shares * l.price, 0);
+    h.shares = ts;
+    h.cost = basis / ts;
+  }
+  return h;
+}
+
+function mergeLotsFromRows(lots) {
+  const totalShares = lots.reduce((a, l) => a + l.shares, 0);
+  if (totalShares <= 0) return null;
+  const basis = lots.reduce((a, l) => a + l.shares * l.price, 0);
+  return { shares: totalShares, cost: basis / totalShares, lots: lots.map(l => ({ shares: l.shares, price: l.price })) };
+}
+
+let tickerLookupTimer = null;
+function scheduleTickerNameLookup() {
+  clearTimeout(tickerLookupTimer);
+  tickerLookupTimer = setTimeout(() => fetchCompanyNameForTicker(), 400);
+}
+
+function markCompanyNameManual() {
+  const el = document.getElementById('m-n');
+  if (el) delete el.dataset.autoFilled;
+}
+
+function fetchCompanyNameForTicker() {
+  const tEl = document.getElementById('m-t');
+  const nEl = document.getElementById('m-n');
+  if (!tEl || !nEl) return;
+  const ticker = tEl.value.trim().toUpperCase();
+  if (ticker.length < 1 || ticker.length > 12) return;
+  const manual = nEl.dataset.autoFilled !== '1' && nEl.value.trim() !== '' && nEl.value.trim() !== ticker;
+  if (manual) return;
+
+  (async () => {
+    try {
+      const r = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/' + encodeURIComponent(ticker) + '?range=1d&interval=1d');
+      if (r.ok) {
+        const j = await r.json();
+        const meta = j.chart && j.chart.result && j.chart.result[0] && j.chart.result[0].meta;
+        const name = meta && (meta.longName || meta.shortName);
+        if (name && document.getElementById('m-t').value.trim().toUpperCase() === ticker) {
+          nEl.value = name;
+          nEl.dataset.autoFilled = '1';
+        }
+        if (name) return;
+      }
+    } catch (e) { /* try search */ }
+    try {
+      const r2 = await fetch('https://query2.finance.yahoo.com/v1/finance/search?q=' + encodeURIComponent(ticker) + '&quotesCount=8&newsCount=0');
+      if (!r2.ok) return;
+      const j2 = await r2.json();
+      const quotes = j2.quotes || [];
+      const symNorm = s => (s || '').toUpperCase().replace(/\.(TO|V|CN)$/,'').split('.')[0];
+      const q = quotes.find(x => symNorm(x.symbol) === ticker) || quotes[0];
+      const name = q && (q.longname || q.shortname);
+      if (name && document.getElementById('m-t').value.trim().toUpperCase() === ticker) {
+        nEl.value = name;
+        nEl.dataset.autoFilled = '1';
+      }
+    } catch (e2) { /* ignore */ }
+  })();
+}
+
+function syncLotRemoveButtons() {
+  const rows = document.querySelectorAll('#m-lot-rows .lot-row');
+  rows.forEach((row, i) => {
+    const btn = row.querySelector('.btn-lot-rm');
+    if (btn) btn.style.visibility = rows.length > 1 ? 'visible' : 'hidden';
+  });
+}
+
+function addLotRow() {
+  const wrap = document.getElementById('m-lot-rows');
+  if (!wrap) return;
+  const first = wrap.querySelector('.lot-row');
+  const row = first.cloneNode(true);
+  row.querySelectorAll('input').forEach(inp => { inp.value = ''; });
+  wrap.appendChild(row);
+  syncLotRemoveButtons();
+  updateLotsSummary();
+}
+
+function removeLotRow(btn) {
+  const wrap = document.getElementById('m-lot-rows');
+  if (!wrap || wrap.querySelectorAll('.lot-row').length <= 1) return;
+  btn.closest('.lot-row').remove();
+  syncLotRemoveButtons();
+  updateLotsSummary();
+}
+
+function updateLotsSummary() {
+  const el = document.getElementById('m-lots-summary');
+  if (!el) return;
+  const lots = [];
+  document.querySelectorAll('#m-lot-rows .lot-row').forEach(row => {
+    const s = parseFloat(row.querySelector('.m-lot-shares').value);
+    const p = parseFloat(row.querySelector('.m-lot-price').value);
+    if (!isNaN(s) && !isNaN(p) && s > 0 && p > 0) lots.push({ shares: s, price: p });
+  });
+  if (!lots.length) { el.textContent = 'Total: — shares · Avg cost: —'; return; }
+  const m = mergeLotsFromRows(lots);
+  el.textContent = 'Total: ' + m.shares + ' shares · Avg cost: ' + fmtC(m.cost);
+}
+
+function resetAddModalForm() {
+  ['m-t','m-n'].forEach(id => { const e = document.getElementById(id); if (e) { e.value = ''; delete e.dataset.autoFilled; } });
+  const wrap = document.getElementById('m-lot-rows');
+  if (wrap) {
+    wrap.innerHTML = '<div class="lot-row">' +
+      '<input class="m-lot-shares" type="number" placeholder="Shares" min="0.001" step="any" inputmode="decimal" oninput="updateLotsSummary()">' +
+      '<input class="m-lot-price" type="number" placeholder="Price ($)" min="0.01" step="any" inputmode="decimal" oninput="updateLotsSummary()">' +
+      '<button type="button" class="btn-lot-rm" onclick="removeLotRow(this)" title="Remove" style="visibility:hidden" aria-label="Remove row">−</button></div>';
+  }
+  syncLotRemoveButtons();
+  updateLotsSummary();
+}
+
 function toast(msg, color) {
   const el = document.getElementById('toast');
   el.textContent = msg; el.style.borderColor = color || 'rgba(0,174,239,.28)';
@@ -350,7 +563,8 @@ async function signOut() {
 
 function showApp(user) {
   currentUser = user;
-  document.getElementById('authScreen').style.display = 'none';
+  const authEl = document.getElementById('authScreen');
+  if (authEl) authEl.style.display = 'none';
   document.getElementById('app').style.display = 'flex';
   const label = user.email ? user.email.split('@')[0].toUpperCase() : 'PORTFOLIO';
   document.getElementById('userEmailLabel').textContent = label;
@@ -366,7 +580,8 @@ window.addEventListener('load', function() {
 async function loadHoldings() {
   setSyncStatus('syncing');
   try {
-    holdings = JSON.parse(localStorage.getItem('mt-holdings-v4') || '[]');
+    holdings = JSON.parse(localStorage.getItem('mt-holdings-v4') || '[]').map(normalizeHoldingLots);
+    try { localStorage.setItem('mt-holdings-v4', JSON.stringify(holdings)); } catch (e) { /* quota */ }
     setSyncStatus('synced');
     renderAll();
     const now = Date.now();
@@ -386,7 +601,7 @@ async function loadHoldings() {
 
 async function dbAddHolding(h) {
   setSyncStatus('syncing');
-  const row = { id: crypto.randomUUID(), ticker: h.ticker, name: h.name, shares: h.shares, cost: h.cost, created_at: new Date().toISOString() };
+  const row = { id: crypto.randomUUID(), ticker: h.ticker, name: h.name, shares: h.shares, cost: h.cost, lots: h.lots, created_at: new Date().toISOString() };
   holdings.push(row);
   localStorage.setItem('mt-holdings-v4', JSON.stringify(holdings));
   setSyncStatus('synced');
@@ -409,14 +624,19 @@ async function dbUpdateName(id, name) {
 async function addHolding() {
   const ticker = document.getElementById('m-t').value.trim().toUpperCase();
   const name   = document.getElementById('m-n').value.trim();
-  const shares = parseFloat(document.getElementById('m-s').value);
-  const cost   = parseFloat(document.getElementById('m-c').value);
-  if(!ticker || !shares || !cost || isNaN(shares) || isNaN(cost)) return toast('Fill in all fields', '#ff4d6a');
+  const lotRows = [];
+  document.querySelectorAll('#m-lot-rows .lot-row').forEach(row => {
+    const s = parseFloat(row.querySelector('.m-lot-shares').value);
+    const p = parseFloat(row.querySelector('.m-lot-price').value);
+    if (!isNaN(s) && !isNaN(p) && s > 0 && p > 0) lotRows.push({ shares: s, price: p });
+  });
+  if (!ticker) return toast('Enter a ticker symbol', '#ff4d6a');
+  if (!lotRows.length) return toast('Add at least one purchase: shares and price per lot', '#ff4d6a');
+  const merged = mergeLotsFromRows(lotRows);
   if(holdings.find(h => h.ticker === ticker)) return toast(ticker + ' already added', '#F0C040');
   try {
-    await dbAddHolding({ ticker, name: name || ticker, shares, cost });
-    const row = holdings[holdings.length - 1];
-    ['m-t','m-n','m-s','m-c'].forEach(id => document.getElementById(id).value = '');
+    await dbAddHolding({ ticker, name: name || ticker, shares: merged.shares, cost: merged.cost, lots: merged.lots });
+    resetAddModalForm();
     closeModal('addModal');
     renderAll();
     toast('Added ' + ticker, '#00e5a0');
@@ -438,14 +658,12 @@ async function removeHolding(id, ticker) {
 
 // ─── Price Fetching ──────────────────────────────────────
 async function fetchPriceFor(ticker) {
+  if (!canCallAnthropic()) return false;
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
+    const res = await anthropicMessages({
         model:'claude-sonnet-4-20250514', max_tokens:300,
         tools:[{type:'web_search_20250305', name:'web_search'}],
         messages:[{role:'user', content:'Search for the current stock price of ' + ticker + '. Reply ONLY with a JSON object, nothing else: {"price":123.45,"change":1.23,"changePct":0.92,"companyName":"Company Name"}'}]
-      })
     });
     const d = await res.json();
     const tb = d.content && d.content.find(b => b.type === 'text');
@@ -522,16 +740,16 @@ function renderHoldings() {
     const td=today!==null?(today>=0?'+':'')+today.toFixed(2)+'%':'—';
     const tc2=today!==null?(today>=0?'pos':'neg'):'neu';
     return '<div class="hcard" onclick="openDetail(\''+h.ticker+'\')">'+
-      '<div class="hc-top"><div><div class="hc-ticker">'+h.ticker+'</div><div class="hc-name">'+h.name+'</div></div><span class="hc-badge '+cls+'">'+pp+'</span></div>'+
+      '<div class="hc-top"><div><div class="hc-ticker">'+h.ticker+'</div><div class="hc-name">'+escapeHtml(h.name)+'</div></div><span class="hc-badge '+cls+'">'+pp+'</span></div>'+
       '<div class="hc-stats">'+
         '<div><div class="hcs-label">PRICE</div><div class="hcs-val">'+pr+'</div></div>'+
         '<div><div class="hcs-label">VALUE</div><div class="hcs-val">'+vl+'</div></div>'+
         '<div><div class="hcs-label">TODAY</div><div class="hcs-val '+tc2+'">'+td+'</div></div>'+
       '</div>'+
       '<div class="hc-actions">'+
-        '<button class="btn btn-refresh btn-xs" onclick="event.stopPropagation();fetchOnePrice(\''+h.ticker+'\',this)">⟳</button>'+
-        '<button class="btn btn-ai btn-xs" onclick="event.stopPropagation();runAIOne(\''+h.ticker+'\')">🤖 Advice</button>'+
-        '<button class="btn btn-danger btn-xs" onclick="event.stopPropagation();removeHolding(\''+h.id+'\',\''+h.ticker+'\')">✕</button>'+
+        '<button type="button" class="btn btn-refresh btn-xs" onclick="event.stopPropagation();fetchOnePrice(\''+h.ticker+'\',this)">⟳</button>'+
+        '<button type="button" class="btn btn-ai btn-xs" onclick="event.stopPropagation();runAIOne(\''+h.ticker+'\')">🤖 Advice</button>'+
+        '<button type="button" class="btn btn-danger btn-xs" onclick="event.stopPropagation();removeHolding(\''+h.id+'\',\''+h.ticker+'\')">✕</button>'+
       '</div>'+
       '</div>';
   }).join('');
@@ -539,18 +757,25 @@ function renderHoldings() {
 
 function openDetail(ticker) {
   const h=holdings.find(h=>h.ticker===ticker); if(!h) return;
+  normalizeHoldingLots(h);
   const p=prices[ticker],ct=h.shares*h.cost,v=p&&p.price?h.shares*p.price:ct;
   const plN=v-ct,plP=ct>0?plN/ct*100:0,cls=plN>=0?'pos':'neg';
+  let lotsBlock = '';
+  if (h.lots && h.lots.length > 1) {
+    lotsBlock = '<div style="margin-bottom:14px"><div style="font-size:10px;color:var(--muted);font-family:\'DM Mono\',monospace;margin-bottom:8px;letter-spacing:.5px">PURCHASE LOTS</div>' +
+      h.lots.map(l => '<div style="display:flex;justify-content:space-between;font-size:12px;font-family:\'DM Mono\',monospace;color:var(--text);margin-bottom:5px"><span>' + l.shares + ' sh</span><span>' + fmtC(l.price) + ' each</span></div>').join('') + '</div>';
+  }
   document.getElementById('detailContent').innerHTML=
     '<div style="font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted);letter-spacing:.5px;margin-bottom:3px">'+ticker+'</div>'+
-    '<div style="font-family:\'Syne\',sans-serif;font-weight:700;font-size:21px;margin-bottom:18px">'+h.name+'</div>'+
+    '<div style="font-family:\'Syne\',sans-serif;font-weight:700;font-size:21px;margin-bottom:12px">'+escapeHtml(h.name)+'</div>'+
+    lotsBlock +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:18px">'+
       dstat('Shares',h.shares)+dstat('Avg Cost',fmtC(h.cost))+dstat('Invested',fmtC(ct))+dstat('Value',fmtC(v))+
       dstat('P&L',(plN>=0?'+':'-')+fmtC(plN),cls)+dstat('P&L %',(plP>=0?'+':'')+plP.toFixed(2)+'%',cls)+
       (p&&p.price?dstat('Current','$'+Number(p.price).toFixed(2)):'')+(p&&p.changePct!==undefined?dstat('Today',(p.changePct>=0?'+':'')+Number(p.changePct).toFixed(2)+'%',p.changePct>=0?'pos':'neg'):'')+
     '</div>'+
-    '<button class="btn btn-ai btn-full" onclick="runAIOne(\''+ticker+'\');closeModal(\'detailModal\')" style="margin-bottom:9px">🤖 Get AI Advice</button>'+
-    '<button class="btn btn-ghost btn-full" onclick="closeModal(\'detailModal\')">Close</button>';
+    '<button type="button" class="btn btn-ai btn-full" onclick="runAIOne(\''+ticker+'\');closeModal(\'detailModal\')" style="margin-bottom:9px">🤖 Get AI Advice</button>'+
+    '<button type="button" class="btn btn-ghost btn-full" onclick="closeModal(\'detailModal\')">Close</button>';
   document.getElementById('detailModal').classList.add('open');
 }
 
@@ -576,22 +801,33 @@ function renderAlloc() {
 // ─── Navigation ──────────────────────────────────────────
 function goPage(name,btn) {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
-  document.getElementById('pg-'+name).classList.add('active');
-  btn.classList.add('active');
-  document.getElementById('fab').style.display=name==='portfolio'?'flex':'none';
+  document.querySelectorAll('#nav .nav-item').forEach(b=>b.classList.remove('active'));
+  const pg=document.getElementById('pg-'+name);
+  if(pg) pg.classList.add('active');
+  if(btn&&btn.classList) btn.classList.add('active');
+  else {
+    const map={portfolio:0,news:1,advice:2};
+    const idx=map[name];
+    const items=document.querySelectorAll('#nav .nav-item');
+    if(typeof idx==='number'&&items[idx]) items[idx].classList.add('active');
+  }
+  const fab=document.getElementById('fab');
+  if(fab) fab.style.display=name==='portfolio'?'flex':'none';
 }
 
 function goToAdvice() {
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
-  document.getElementById('pg-advice').classList.add('active');
-  document.querySelectorAll('.nav-item')[2].classList.add('active');
-  document.getElementById('fab').style.display='none';
+  document.querySelectorAll('#nav .nav-item').forEach(b=>b.classList.remove('active'));
+  const pg=document.getElementById('pg-advice');
+  if(pg) pg.classList.add('active');
+  const adviceBtn=document.getElementById('nav-advice')||document.querySelector('#nav .nav-item:last-of-type');
+  if(adviceBtn) adviceBtn.classList.add('active');
+  const fab=document.getElementById('fab');
+  if(fab) fab.style.display='none';
 }
 
 // ─── Modals ──────────────────────────────────────────────
-function openAdd() { document.getElementById('addModal').classList.add('open'); setTimeout(()=>document.getElementById('m-t').focus(),350); }
+function openAdd() { resetAddModalForm(); document.getElementById('addModal').classList.add('open'); setTimeout(()=>document.getElementById('m-t').focus(),350); }
 function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 function bgClose(e) { if(e.target===e.currentTarget) e.currentTarget.classList.remove('open'); }
 
@@ -602,12 +838,10 @@ async function fetchNews() {
   const tickers=holdings.map(h=>h.ticker).join(', ');
   w.innerHTML='<div class="loading-row"><div class="spinner"></div> Fetching news for '+tickers+'…</div>';
   try {
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,
+    if (!canCallAnthropic()) { w.innerHTML='<div class="empty"><div class="empty-icon">🔑</div><div class="empty-text">Set API key or proxy (see Advice tab help)</div></div>'; return; }
+    const res=await anthropicMessages({model:'claude-sonnet-4-20250514',max_tokens:1500,
         tools:[{type:'web_search_20250305',name:'web_search'}],
-        messages:[{role:'user',content:'Search for the latest financial news (last 48 hours) for these stocks: '+tickers+'. Return ONLY a JSON array, no markdown: [{"ticker":"AAPL","title":"Headline","summary":"One sentence.","source":"Reuters","age":"2h ago","sentiment":"positive"}]. Sentiment: positive, negative, or neutral. Up to 8 items.'}]})
-    });
+        messages:[{role:'user',content:'Search for the latest financial news (last 48 hours) for these stocks: '+tickers+'. Return ONLY a JSON array, no markdown: [{"ticker":"AAPL","title":"Headline","summary":"One sentence.","source":"Reuters","age":"2h ago","sentiment":"positive"}]. Sentiment: positive, negative, or neutral. Up to 8 items.'}]});
     const d=await res.json();
     const tb=d.content&&d.content.find(b=>b.type==='text');
     if(tb){const m=tb.text.replace(/```json|```/g,'').trim().match(/\[[\s\S]*\]/);if(m){renderNews(JSON.parse(m[0]));return;}}
@@ -631,56 +865,158 @@ function renderNews(items) {
 
 // ─── AI Advice ───────────────────────────────────────────
 async function runAIOne(ticker) {
-  const h=holdings.find(h=>h.ticker===ticker); if(!h) return;
-  goToAdvice();
+  const h=holdings.find(x=>x.ticker===ticker);
+  if(!h){ toast('Add this holding first or refresh the page'); return; }
+  try { goToAdvice(); } catch(e) { console.error(e); }
   const p=prices[ticker],pl=p&&p.price?((p.price-h.cost)/h.cost*100).toFixed(2):'unknown';
   const w=document.getElementById('adviceWrap');
-  let ex=document.getElementById('adv-'+ticker);
-  if(!ex){ex=document.createElement('div');ex.id='adv-'+ticker;w.insertBefore(ex,w.firstChild);}
-  const empty=w.querySelector('.empty'); if(empty) empty.remove();
-  ex.className='acard';
-  ex.innerHTML='<div class="loading-row"><div class="spinner"></div> Analyzing '+ticker+'…</div>';
+  if(w) w.innerHTML='<div class="loading-row"><div class="spinner"></div> Analyzing '+escapeHtml(ticker)+'…</div>';
   await callAI([{...h,currentPrice:p&&p.price,plPct:pl,todayChange:p&&p.changePct}]);
 }
 
 async function runAIAll() {
   if(!holdings.length) return toast('No holdings yet');
-  goToAdvice();
-  document.getElementById('adviceWrap').innerHTML='<div class="loading-row"><div class="spinner"></div> Analyzing all holdings…</div>';
+  try { goToAdvice(); } catch(e) { console.error(e); }
+  const w=document.getElementById('adviceWrap');
+  if(w) w.innerHTML='<div class="loading-row"><div class="spinner"></div> Analyzing all holdings…</div>';
   const enriched=holdings.map(h=>{
     const p=prices[h.ticker],pl=p&&p.price?((p.price-h.cost)/h.cost*100).toFixed(2):'unknown';
     return{...h,currentPrice:p&&p.price,plPct:pl,todayChange:p&&p.changePct};
   });
-  await callAI(enriched);
-  fetchNews();
+  const ok=await callAI(enriched);
+  if(ok) fetchNews();
+}
+
+function buildFundamentalAnalysisPrompt(holdingsBlock) {
+  return 'You are a senior equity research analyst. For EACH ticker below you MUST use web_search to gather recent fundamentals (filings, investor decks, or reputable financial data). Apply this valuation framework before recommending.\n\n' +
+    '## 1) Relative valuation (comparison)\n' +
+    '- Report P/E, PEG, P/S, and P/B where meaningful (label currency; say approx/estimated when needed).\n' +
+    '- PEG = (P/E) divided by expected annual EPS growth rate (as a number, e.g. growth 12% means denominator 12). Interpret: PEG below ~1 often suggests better value vs growth; ~1 fair; above ~2 potentially expensive vs growth.\n' +
+    '- Briefly compare to sector peers or the stock own history when possible.\n\n' +
+    '## 2) Absolute valuation (intrinsic)\n' +
+    '- Primary: multi-year DCF-style logic on free cash flow (FCF): present value of FCF for projection years t=1..n using discount rate r (WACC or explicit discount, often ~8–12% for mature firms unless justified).\n' +
+    '- Terminal value (Gordon growth): TV = FCF_{n+1} / (r - g) with perpetual growth g < r (g often ~2–3% long-run).\n' +
+    '- Equity per share: Enterprise Value minus net debt plus cash approximates equity value; divide by diluted shares for intrinsic value per share.\n' +
+    '- Give an intrinsic VALUE RANGE per share (not fake precision), with currency.\n' +
+    '- If dividends are central to the thesis, add one sentence on dividend discount model (DDM) relevance.\n\n' +
+    '## 3) Qualitative (moat)\n' +
+    '- Economic moat, management quality / alignment (buybacks, insider ownership), industry growth vs disruption risk.\n\n' +
+    '## 4) Pre-buy checklist (state PASS, WATCH, or FAIL each with one short reason)\n' +
+    '- Profitability and FCF trend (~5 years if data exists).\n' +
+    '- Debt manageable: Debt/Equity roughly under ~2 as a rule of thumb unless sector norms differ.\n' +
+    '- Margin of safety: compare market price to intrinsic range; pros often want ~20–30% discount to conservative intrinsic.\n\n' +
+    '## Recommendation\n' +
+    '- Output exactly one of: BUY MORE, HOLD, SELL (use BUY MORE not BUY).\n\n' +
+    'Holdings (user avg cost; last price from app may be stale—verify market price via search):\n' + holdingsBlock + '\n\n' +
+    'Return ONLY a JSON array. No markdown code fences. Each object MUST include all keys in this example (use strings; use N/A only when truly not applicable):\n' +
+    '[{"ticker":"SYM","recommendation":"HOLD","confidence":"HIGH","summaryVerdict":"...","relativeValuation":{"pe":"...","peNote":"...","peg":"...","pegNote":"...","ps":"...","pb":"...","peerComparison":"..."},"absoluteValuation":{"methodPrimary":"DCF","discountRatePct":"10","projectionYears":"5","terminalGrowthPct":"2.5","intrinsicRangePerShare":"$X–$Y CUR","currentPriceInAnalysis":"$Z CUR","marginOfSafetyPct":"20","marginOfSafetyNote":"...","equityBridgeNote":"EV, debt, cash, shares — one line"},"dividendModelNote":"... or N/A","qualitative":{"moat":"...","management":"...","industryTrends":"..."},"checklist":{"profitableTrend":"PASS — ...","debtManageable":"WATCH — ...","marginOfSafetyOk":"FAIL — ..."},"reasoning":"...","keyRisk":"...","keyPositive":"..."}]';
+}
+
+function checklistRowClass(text) {
+  const t = (text || '').trim().toUpperCase();
+  if (t.startsWith('PASS')) return 'pass';
+  if (t.startsWith('FAIL')) return 'fail';
+  return 'watch';
 }
 
 async function callAI(stocks) {
   const w=document.getElementById('adviceWrap');
-  const info=stocks.map(s=>s.ticker+' ('+s.name+'): bought $'+s.cost+', current $'+(s.currentPrice||'unknown')+', P&L '+s.plPct+'%, today '+(s.todayChange!==undefined?s.todayChange:'unknown')+'%').join('\n');
+  if(!w) { toast('Advice panel not found'); return false; }
+  if(!stocks||!stocks.length) { w.innerHTML='<div class="empty"><div class="empty-icon">🤖</div><div class="empty-text">No holdings to analyze.</div></div>'; return false; }
+  if(!canCallAnthropic()) {
+    w.innerHTML='<div class="empty"><div class="empty-icon">🔑</div><div class="empty-text">Connect Claude (proxy on GitHub Pages)</div><div class="name-hint" style="margin-top:12px;text-align:left">On <strong>github.io</strong> the app uses your Vercel proxy only (browser blocks api.anthropic.com). Deploy <code style="color:var(--cyan)">api/anthropic.js</code> on Vercel with env <code style="color:var(--cyan)">ANTHROPIC_API_KEY</code> and set Vercel <code style="color:var(--cyan)">ALLOW_ORIGIN</code> to <code style="color:var(--cyan)">https://midastechinc.github.io</code>. Push the latest <code style="color:var(--cyan)">index.html</code> to GitHub. Optional override:<br><code style="color:var(--cyan);word-break:break-all">localStorage.setItem(&quot;mt-anthropic-proxy&quot;,&quot;https://….vercel.app/api/anthropic&quot;)</code></div></div>';
+    toast('Use proxy on GitHub Pages — see Advice tab', '#F0C040');
+    return false;
+  }
+  const info=stocks.map(s=>s.ticker+' ('+s.name+'): shares '+s.shares+', avg cost $'+s.cost+', app last price $'+(s.currentPrice!=null?s.currentPrice:'unknown')+', user P&L vs cost '+s.plPct+'%, session change % '+(s.todayChange!==undefined?s.todayChange:'unknown')).join('\n');
+  w.innerHTML='<div class="loading-row"><div class="spinner"></div> Contacting AI…</div>';
   try {
-    const res=await fetch('https://api.anthropic.com/v1/messages',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,
+    const res=await anthropicMessages({model:'claude-sonnet-4-20250514',max_tokens:8192,
         tools:[{type:'web_search_20250305',name:'web_search'}],
-        messages:[{role:'user',content:'You are a financial analyst. Search for current news and fundamentals for these stocks and provide BUY MORE, HOLD, or SELL recommendations.\n\nHoldings:\n'+info+'\n\nReturn ONLY a JSON array, no markdown:\n[{"ticker":"AAPL","recommendation":"HOLD","confidence":"HIGH","reasoning":"2-3 sentence rationale","keyRisk":"Main risk","keyPositive":"Main positive"}]'}]})
-    });
-    const d=await res.json();
+        messages:[{role:'user',content:buildFundamentalAnalysisPrompt(info)}]});
+    const d=await res.json().catch(()=>({}));
+    if(!res.ok){
+      const msg=(d.error&&d.error.message)||d.message||('HTTP '+res.status);
+      w.innerHTML='<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">API: '+escapeHtml(msg)+'</div><div class="name-hint" style="margin-top:12px;text-align:left">Open the browser console on this page and run:<br><code style="color:var(--cyan);word-break:break-all">localStorage.setItem(&quot;mt-anthropic-key&quot;,&quot;YOUR_ANTHROPIC_API_KEY&quot;)</code><br>then refresh. Keys stay in your browser only. If you see a CORS error, use a small backend proxy instead of calling the API from the page.</div></div>';
+      toast('AI API error — see Advice tab', '#ff4d6a');
+      return false;
+    }
     const tb=d.content&&d.content.find(b=>b.type==='text');
-    if(tb){const m=tb.text.replace(/```json|```/g,'').trim().match(/\[[\s\S]*\]/);if(m){renderAdvice(JSON.parse(m[0]),stocks);return;}}
-    w.innerHTML='<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">AI analysis failed. Try again.</div></div>';
-  } catch(e){ w.innerHTML='<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Error: '+e.message+'</div></div>'; }
+    if(tb){
+      const m=tb.text.replace(/```json|```/g,'').trim().match(/\[[\s\S]*\]/);
+      if(m){
+        try {
+          const arr=JSON.parse(m[0]);
+          if(Array.isArray(arr)&&arr.length) { renderAdvice(arr,stocks); return true; }
+        } catch(pe) { console.warn(pe); }
+      }
+    }
+    w.innerHTML='<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Could not parse AI response. Try &quot;Run All&quot; again.</div></div>';
+    return false;
+  } catch(e){
+    const m=e.message||String(e);
+    const looksLikeCors=/failed to fetch|networkerror|load failed|network request failed/i.test(m);
+    const hint=looksLikeCors?'<div class="name-hint" style="margin-top:12px;text-align:left">The browser blocked the request to Anthropic (normal for GitHub Pages). Use the <strong>proxy</strong>: deploy <code style="color:var(--cyan)">api/anthropic.js</code> on Vercel, set server env <code style="color:var(--cyan)">ANTHROPIC_API_KEY</code>, then run <code style="color:var(--cyan);word-break:break-all">localStorage.setItem(&quot;mt-anthropic-proxy&quot;,&quot;https://…vercel.app/api/anthropic&quot;)</code> and refresh.</div>':'';
+    w.innerHTML='<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Network: '+escapeHtml(m)+'</div>'+hint+'</div>';
+    toast(looksLikeCors?'Use Vercel proxy — see message on Advice tab':'Network error', '#ff4d6a');
+    return false;
+  }
 }
 
 function renderAdvice(advices,stocks){
   const w=document.getElementById('adviceWrap');
   const rc={'HOLD':'#F0C040','BUY MORE':'#00e5a0','SELL':'#ff4d6a','BUY':'#00e5a0'};
   const rb={'HOLD':'rgba(240,192,64,.12)','BUY MORE':'rgba(0,229,160,.12)','SELL':'rgba(255,77,106,.12)','BUY':'rgba(0,229,160,.12)'};
-  w.innerHTML='<div class="disclaimer">⚠️ AI-generated analysis only. Not financial advice.</div>'+
+  const banner='<div class="fund-banner"><strong>Method</strong> — Relative: P/E, PEG (P/E ÷ EPS growth %), P/S, P/B vs peers. Absolute: DCF (PV of FCF + Gordon terminal TV = FCFₙ₊₁÷(r−g), g&lt;r) → equity value per share. Qualitative moat. Checklist: profit/FCF trend, debt (D/E ~ under 2 rule of thumb), 20–30% margin of safety vs conservative intrinsic.</div>';
+  const disc='<div class="disclaimer">⚠️ AI-generated fundamental-style analysis only. Figures are model estimates from web sources — not financial advice.</div>';
+  function vrow(l,v){ return '<div class="vrow"><span>'+escapeHtml(l)+'</span><span>'+escapeHtml(v)+'</span></div>'; }
+  w.innerHTML=disc+banner+
     advices.map(a=>{
       const h=stocks.find(s=>s.ticker===a.ticker)||{};
       const rec=(a.recommendation||'HOLD').toUpperCase(),col=rc[rec]||'var(--muted)',bg=rb[rec]||'rgba(255,255,255,.05)';
-      return '<div class="acard"><div class="atop"><div><span class="aticker">'+a.ticker+'</span> <span class="aname">'+( h.name||'')+'</span></div><span class="rec-pill" style="background:'+bg+';color:'+col+';border:1px solid '+col+'33">'+rec+'</span></div><div class="atext">'+a.reasoning+'</div><div class="akv"><div class="kup">▲ '+a.keyPositive+'</div><div class="kdn">▼ '+a.keyRisk+'</div></div><div class="aconf">Confidence: '+(a.confidence||'MEDIUM')+'</div></div>';
+      const rv=a.relativeValuation||{};
+      const av=a.absoluteValuation||{};
+      const ql=a.qualitative||{};
+      const ck=a.checklist||{};
+      let relBlock='', absBlock='', qualBlock='', checkBlock='', sumV='';
+      if(rv && typeof rv==='object'){
+        relBlock='<div class="vblock"><div class="vblock-title">Relative valuation</div>'+
+          vrow('P/E',rv.pe||'—')+(rv.peNote?'<div class="vpara">'+escapeHtml(rv.peNote)+'</div>':'')+
+          vrow('PEG',rv.peg||'—')+(rv.pegNote?'<div class="vpara">'+escapeHtml(rv.pegNote)+'</div>':'')+
+          vrow('P/S',rv.ps||'—')+vrow('P/B',rv.pb||'—')+
+          (rv.peerComparison?'<div class="vpara">'+escapeHtml(rv.peerComparison)+'</div>':'')+'</div>';
+      }
+      if(av && typeof av==='object'){
+        absBlock='<div class="vblock"><div class="vblock-title">Absolute valuation (DCF-style)</div>'+
+          vrow('Primary method',av.methodPrimary||'DCF')+
+          vrow('Discount r (%)',av.discountRatePct||'—')+
+          vrow('Projection (yrs)',av.projectionYears||'—')+
+          vrow('Terminal g (%)',av.terminalGrowthPct||'—')+
+          vrow('Intrinsic range / sh',av.intrinsicRangePerShare||'—')+
+          vrow('Price in analysis',av.currentPriceInAnalysis||'—')+
+          vrow('Margin of safety %',av.marginOfSafetyPct!=null?String(av.marginOfSafetyPct):'—')+
+          (av.marginOfSafetyNote?'<div class="vpara">'+escapeHtml(av.marginOfSafetyNote)+'</div>':'')+
+          (av.equityBridgeNote?'<div class="vpara">'+escapeHtml(av.equityBridgeNote)+'</div>':'')+'</div>';
+      }
+      if(ql && typeof ql==='object' && (ql.moat||ql.management||ql.industryTrends)){
+        qualBlock='<div class="vblock"><div class="vblock-title">Qualitative (moat)</div>'+
+          (ql.moat?'<div class="vpara"><strong>Moat</strong> '+escapeHtml(ql.moat)+'</div>':'')+
+          (ql.management?'<div class="vpara"><strong>Management</strong> '+escapeHtml(ql.management)+'</div>':'')+
+          (ql.industryTrends?'<div class="vpara"><strong>Industry</strong> '+escapeHtml(ql.industryTrends)+'</div>':'')+'</div>';
+      }
+      if(ck && typeof ck==='object'){
+        checkBlock='<div class="vblock"><div class="vblock-title">Pre-buy checklist</div><div class="check-grid">'+
+          (ck.profitableTrend?'<div class="check-item '+checklistRowClass(ck.profitableTrend)+'">'+escapeHtml(ck.profitableTrend)+'</div>':'')+
+          (ck.debtManageable?'<div class="check-item '+checklistRowClass(ck.debtManageable)+'">'+escapeHtml(ck.debtManageable)+'</div>':'')+
+          (ck.marginOfSafetyOk?'<div class="check-item '+checklistRowClass(ck.marginOfSafetyOk)+'">'+escapeHtml(ck.marginOfSafetyOk)+'</div>':'')+
+          '</div></div>';
+      }
+      if(a.summaryVerdict) sumV='<div class="sum-verdict">'+escapeHtml(a.summaryVerdict)+'</div>';
+      const leg='<div class="atext">'+(a.reasoning?escapeHtml(a.reasoning):'')+'</div><div class="akv"><div class="kup">▲ '+escapeHtml(a.keyPositive||'—')+'</div><div class="kdn">▼ '+escapeHtml(a.keyRisk||'—')+'</div></div><div class="aconf">Confidence: '+escapeHtml(a.confidence||'MEDIUM')+'</div>';
+      return '<div class="acard"><div class="atop"><div><span class="aticker">'+escapeHtml(a.ticker)+'</span> <span class="aname">'+escapeHtml(h.name||'')+'</span></div><span class="rec-pill" style="background:'+bg+';color:'+col+';border:1px solid '+col+'33">'+escapeHtml(rec)+'</span></div>'+
+        sumV+relBlock+absBlock+
+        (a.dividendModelNote?'<div class="vblock"><div class="vblock-title">Dividend model (DDM)</div><div class="vpara">'+escapeHtml(a.dividendModelNote)+'</div></div>':'')+
+        qualBlock+checkBlock+leg+'</div>';
     }).join('');
 }
 </script>
