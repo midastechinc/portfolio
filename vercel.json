@@ -5,6 +5,9 @@
     },
     "api/yahoo-search.js": {
       "maxDuration": 15
+    },
+    "api/gemini.js": {
+      "maxDuration": 120
     }
   }
 }
