@@ -1,0 +1,5 @@
+.venv/
+.cache/
+.env.local
+__pycache__/
+scripts/__pycache__/

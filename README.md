@@ -127,59 +127,6 @@ Save the file and re-upload it to GitHub (or commit the change).
 
 ---
 
-## LinkedIn Pull Setup
-
-The repo now includes a GitHub Actions workflow and Python scraper for the LeadTracker dashboard.
-
-### Required tables
-
-Run the latest `schema.sql` in Supabase so these tables exist:
-
-- `linkedin_received_invites`
-- `linkedin_message_replies`
-- `linkedin_sent_invites`
-
-### Required GitHub Actions secrets
-
-Add these repo secrets in GitHub for `midastechinc/portfolio`:
-
-- `LINKEDIN_EMAIL`
-- `LINKEDIN_PASSWORD`
-- `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `LINKEDIN_SESSION_JSON` (recommended for the first successful run)
-
-### Triggering
-
-- Manual: dispatch `linkedin_pull.yml`
-- Automatic: runs daily at `13:15 UTC`
-
-The workflow installs Playwright, logs into LinkedIn, scrapes the three dashboard sections, and replaces the table contents in Supabase with the latest pull.
-
-### First-time LinkedIn session bootstrap
-
-LinkedIn often challenges fresh headless logins from GitHub Actions. The easiest workaround is to create a trusted session locally once, then store that cookie JSON in the repository secret `LINKEDIN_SESSION_JSON`.
-
-Example local bootstrap flow:
-
-```powershell
-$env:LINKEDIN_BOOTSTRAP_SESSION_ONLY="true"
-$env:LINKEDIN_HEADLESS="false"
-$env:LINKEDIN_COOKIE_FILE=".cache/linkedin_session.json"
-python scripts/linkedin_scraper.py
-```
-
-When the visible browser opens:
-
-1. Complete LinkedIn sign-in and any checkpoint/MFA prompt.
-2. Wait until LinkedIn lands on Feed, My Network, or Messaging.
-3. The script saves `.cache/linkedin_session.json`.
-4. Copy the full JSON file contents into the GitHub Actions secret `LINKEDIN_SESSION_JSON`.
-
-After that, the workflow can seed the saved session before running the scraper.
-
----
-
 ## Support
 
 Ali Jaffar — Midas Tech Inc.  
