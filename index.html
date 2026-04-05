@@ -210,7 +210,7 @@ body::before {
 .ticker-sug-sym { font-family:'DM Mono',monospace; font-weight:600; color:var(--cyan); font-size:14px; flex-shrink:0; }
 .ticker-sug-name { flex:1; min-width:120px; line-height:1.35; color:var(--text); }
 .ticker-sug-ex { font-size:10px; color:var(--muted); font-family:'DM Mono',monospace; width:100%; margin-top:2px; }
-.ticker-suggest-empty { padding:14px; font-size:12px; color:var(--muted); font-family:'DM Mono',monospace; text-align:center; }
+.ticker-suggest-empty { padding:14px; font-size:12px; color:#cbd5e1; font-family:'DM Mono',monospace; text-align:center; line-height:1.45; }
 
 /* ─── NEWS ─── */
 .news-card { background:linear-gradient(165deg,rgba(30,41,59,.45),rgba(15,23,42,.9)); border:1px solid var(--border); border-radius:var(--radius); padding:16px; margin-bottom:12px; box-shadow:var(--shadow-sm); }
@@ -357,7 +357,7 @@ body::before {
         <div class="sec-title">🤖 AI Recommendations</div>
         <button type="button" class="btn btn-ai btn-sm" onclick="runAIAll()">Run All</button>
       </div>
-      <div class="disclaimer">⚠️ AI fundamental-style analysis only — not financial advice. Models use estimated web data; consult a licensed advisor.</div>
+      <div class="disclaimer">⚠️ AI fundamental-style analysis only — not financial advice. Uses <strong>Gemini</strong> (free tier via Google AI) and/or <strong>Claude</strong> with web grounding; consult a licensed advisor.</div>
       <div id="adviceWrap">
         <div class="empty"><div class="empty-icon">🤖</div><div class="empty-text">Tap "AI All" or 🤖 on any holding</div></div>
       </div>
@@ -388,15 +388,16 @@ body::before {
       <div class="field field-ticker-wrap"><label>Symbol or company</label><input type="text" id="m-t" placeholder="e.g. AAPL or Apple" style="text-transform:uppercase" autocomplete="off" autocorrect="off" spellcheck="false" oninput="scheduleTickerSuggest()" onfocus="scheduleTickerSuggest()" onkeydown="tickerSuggestKeydown(event)" onblur="handleTickerFieldBlur()"></div>
       <div class="field"><label>Company Name</label><input type="text" id="m-n" placeholder="Choose from list above or type" autocomplete="off" oninput="markCompanyNameManual()"><div class="name-hint">Pick a match from the dropdown, or enter a symbol and tab away — name comes from Yahoo Finance.</div></div>
       <div class="lots-wrap">
-        <span class="lots-label">Purchase lots</span>
+        <span class="lots-label">Shares & price paid</span>
+        <div class="name-hint" style="margin-bottom:10px;margin-top:-4px">Number of shares you own and what you paid per share. Add another row only if you bought more at a different price.</div>
         <div id="m-lot-rows">
           <div class="lot-row">
-            <input class="m-lot-shares" type="number" placeholder="Shares" min="0.001" step="any" inputmode="decimal" oninput="updateLotsSummary()">
-            <input class="m-lot-price" type="number" placeholder="Price ($)" min="0.01" step="any" inputmode="decimal" oninput="updateLotsSummary()">
+            <input class="m-lot-shares" type="number" placeholder="# shares" min="0.001" step="any" inputmode="decimal" oninput="updateLotsSummary()">
+            <input class="m-lot-price" type="number" placeholder="Price / share ($)" min="0.01" step="any" inputmode="decimal" oninput="updateLotsSummary()">
             <button type="button" class="btn-lot-rm" onclick="removeLotRow(this)" title="Remove" style="visibility:hidden" aria-label="Remove row">−</button>
           </div>
         </div>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="addLotRow()" style="width:100%;margin-bottom:10px;font-size:12px">+ Add another purchase (different price)</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addLotRow()" style="width:100%;margin-bottom:10px;font-size:12px">+ Another buy (different price per share)</button>
         <div class="lots-summary" id="m-lots-summary">Total: — shares · Avg cost: —</div>
       </div>
       <button type="button" class="btn btn-primary btn-full" onclick="addHolding()" style="margin-bottom:10px">Add Holding</button>
@@ -415,9 +416,9 @@ body::before {
       <div class="field"><label>Ticker</label><input type="text" id="e-t" readonly tabindex="-1" style="text-transform:uppercase;opacity:.88;cursor:default" autocomplete="off"></div>
       <div class="field"><label>Company Name</label><input type="text" id="e-n" placeholder="Company name" autocomplete="off"></div>
       <div class="lots-wrap">
-        <span class="lots-label">Purchase lots</span>
+        <span class="lots-label">Shares & price paid</span>
         <div id="e-lot-rows"></div>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="addEditLotRow()" style="width:100%;margin-bottom:10px;font-size:12px">+ Add another lot</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="addEditLotRow()" style="width:100%;margin-bottom:10px;font-size:12px">+ Another buy (different price per share)</button>
         <div class="lots-summary" id="e-lots-summary">Total: — shares · Avg cost: —</div>
       </div>
       <button type="button" class="btn btn-primary btn-full" onclick="saveEditedHolding()" style="margin-bottom:10px">Save changes</button>
@@ -441,6 +442,7 @@ body::before {
 // ─── No external dependencies ───────────────────────────
 const sb = null; // Supabase removed — using localStorage
 const CLAUDE_MODEL = 'claude-sonnet-4-20250514';
+const GEMINI_MODEL = 'gemini-2.0-flash';
 const ADVICE_MAX_OUT = 3072;
 const ADVICE_STAGGER_MS = 13000;
 function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
@@ -463,6 +465,7 @@ function getAnthropicKey() {
 }
 /** Vercel proxy for GitHub Pages (key lives on Vercel only). Change if your Vercel URL changes. */
 const MT_DEFAULT_VERCEL_PROXY = 'https://portfolio-lake-delta-uzgpfwpwmx.vercel.app/api/anthropic';
+const MT_DEFAULT_VERCEL_GEMINI = MT_DEFAULT_VERCEL_PROXY.replace(/\/api\/anthropic\/?$/i, '/api/gemini');
 function isAnthropicDirectBlockedHere() {
   try {
     if (typeof location === 'undefined') return false;
@@ -476,16 +479,228 @@ function getAnthropicProxyUrl() {
     if (u.startsWith('http://') || u.startsWith('https://')) return u;
     if (typeof location !== 'undefined' && /\.vercel\.app$/i.test(location.hostname))
       return location.origin + '/api/anthropic';
-    if (isAnthropicDirectBlockedHere()) {
-      const p = location.pathname || '';
-      if (p.indexOf('portfolio') !== -1) return MT_DEFAULT_VERCEL_PROXY;
-    }
+    if (isAnthropicDirectBlockedHere()) return MT_DEFAULT_VERCEL_PROXY;
     return '';
   } catch (e) { return ''; }
 }
 function canCallAnthropic() {
   if (isAnthropicDirectBlockedHere()) return !!getAnthropicProxyUrl();
   return !!getAnthropicProxyUrl() || getAnthropicKey().length > 20;
+}
+
+function getGeminiKey() {
+  try { return localStorage.getItem('mt-gemini-key') || ''; } catch (e) { return ''; }
+}
+function getGeminiProxyUrl() {
+  try {
+    const u = (localStorage.getItem('mt-gemini-proxy') || '').trim().replace(/\/$/, '');
+    if (u.startsWith('http://') || u.startsWith('https://')) return u;
+    if (typeof location !== 'undefined' && /\.vercel\.app$/i.test(location.hostname))
+      return location.origin + '/api/gemini';
+    if (isAnthropicDirectBlockedHere()) return MT_DEFAULT_VERCEL_GEMINI;
+    return '';
+  } catch (e) { return ''; }
+}
+function canCallGemini() {
+  if (isAnthropicDirectBlockedHere()) return !!getGeminiProxyUrl();
+  return !!getGeminiProxyUrl() || getGeminiKey().length >= 20;
+}
+/** mt-ai-provider: auto (try Gemini then Claude), gemini, anthropic */
+function getAiProviderOrder() {
+  try {
+    const pref = (localStorage.getItem('mt-ai-provider') || 'auto').toLowerCase();
+    const hasG = canCallGemini();
+    const hasA = canCallAnthropic();
+    if (pref === 'gemini') return hasG ? ['gemini'] : [];
+    if (pref === 'anthropic') return hasA ? ['anthropic'] : [];
+    const o = [];
+    if (hasG) o.push('gemini');
+    if (hasA) o.push('anthropic');
+    return o;
+  } catch (e) {
+    if (canCallGemini()) return ['gemini'];
+    if (canCallAnthropic()) return ['anthropic'];
+    return [];
+  }
+}
+function canCallAI() {
+  return getAiProviderOrder().length > 0;
+}
+function extractGeminiText(d) {
+  const c = d.candidates && d.candidates[0] && d.candidates[0].content;
+  const parts = c && c.parts;
+  if (!parts || !parts.length) return '';
+  return parts.map(function(p) { return p.text || ''; }).join('');
+}
+async function runAiProvider(prov, userText, maxTokens, useWebSearch) {
+  if (prov === 'gemini') {
+    const payload = {
+      model: GEMINI_MODEL,
+      contents: [{ role: 'user', parts: [{ text: userText }] }],
+      generationConfig: { maxOutputTokens: maxTokens, temperature: 0.25 }
+    };
+    if (useWebSearch) payload.tools = [{ google_search: {} }];
+    const proxy = getGeminiProxyUrl();
+    let url, fetchOpts;
+    if (proxy) {
+      url = proxy;
+      fetchOpts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) };
+    } else {
+      const k = getGeminiKey();
+      if (k.length < 20) throw new Error('Missing Gemini — set mt-gemini-key or Vercel GEMINI_API_KEY + api/gemini.js');
+      const rest = Object.assign({}, payload);
+      delete rest.model;
+      url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(GEMINI_MODEL) + ':generateContent?key=' + encodeURIComponent(k);
+      fetchOpts = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(rest) };
+    }
+    try { window.__mtLastAiUrl = url.indexOf('?') >= 0 ? url.split('?')[0] : url; } catch (z) {}
+    const res = await fetch(url, fetchOpts);
+    const d = await res.json().catch(function() { return {}; });
+    if (!res.ok) {
+      const msg = (d.error && d.error.message) || d.error || d.message || ('HTTP ' + res.status);
+      throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg));
+    }
+    return { provider: 'gemini', text: extractGeminiText(d), raw: d };
+  }
+  if (prov === 'anthropic') {
+    const bodyObj = {
+      model: CLAUDE_MODEL,
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: userText }]
+    };
+    if (useWebSearch) bodyObj.tools = [{ type: 'web_search_20250305', name: 'web_search' }];
+    if (isAnthropicDirectBlockedHere() && !getAnthropicProxyUrl())
+      throw new Error('Anthropic proxy required on GitHub Pages');
+    try { window.__mtLastAiUrl = getAnthropicProxyUrl() || 'https://api.anthropic.com/v1/messages'; } catch (z) {}
+    const res = await anthropicMessages(bodyObj);
+    const d = await res.json().catch(function() { return {}; });
+    if (!res.ok) {
+      const msg = (d.error && d.error.message) || d.message || ('HTTP ' + res.status);
+      throw new Error(msg);
+    }
+    const tb = d.content && d.content.find(function(b) { return b.type === 'text'; });
+    return { provider: 'anthropic', text: tb ? tb.text : '', raw: d };
+  }
+  throw new Error('Unknown AI provider');
+}
+async function aiCompleteForPrompt(userText, maxTokens, useWebSearch) {
+  const order = getAiProviderOrder();
+  if (!order.length) throw new Error('No AI provider configured');
+  let lastErr = '';
+  for (let i = 0; i < order.length; i++) {
+    try {
+      return await runAiProvider(order[i], userText, maxTokens, useWebSearch);
+    } catch (e) {
+      lastErr = e.message || String(e);
+    }
+  }
+  throw new Error(lastErr || 'AI request failed');
+}
+
+/** Yahoo Finance search: GitHub Pages uses /api/yahoo-search on Vercel (same project as Claude). */
+function yahooSearchProxyUrl() {
+  const p = getAnthropicProxyUrl() || MT_DEFAULT_VERCEL_PROXY;
+  return p.replace(/\/api\/anthropic\/?$/i, '/api/yahoo-search');
+}
+function pushYahooSearchUrlUnique(arr, u) {
+  if (u && arr.indexOf(u) === -1) arr.push(u);
+}
+/** Alpha Vantage allows CORS * — works on GitHub Pages without Vercel. Demo key is rate-limited; optional localStorage mt-alphavantage-key. */
+function alphavantageQuotesFromJson(j) {
+  var bm = j && j.bestMatches;
+  if (!Array.isArray(bm) || !bm.length) return null;
+  return bm.map(function(m) {
+    var sym = m['1. symbol'] || m.symbol || '';
+    var name = m['2. name'] || '';
+    var region = m['4. region'] || '';
+    return {
+      symbol: sym,
+      shortname: name,
+      longname: name,
+      exchDisp: region,
+      exchange: region,
+      quoteType: 'EQUITY',
+      type: 'EQUITY'
+    };
+  });
+}
+async function tryAlphaVantageSymbolSearch(qry) {
+  var key = 'demo';
+  try {
+    var k = (localStorage.getItem('mt-alphavantage-key') || '').trim();
+    if (k.length >= 8) key = k;
+  } catch (e) {}
+  var url = 'https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=' + encodeURIComponent(qry) + '&apikey=' + encodeURIComponent(key);
+  try {
+    var r = await fetch(url);
+    var j = await r.json().catch(function() { return null; });
+    if (!r.ok || j == null) return { ok: false, err: 'Alpha Vantage HTTP ' + r.status };
+    if (j.Note || j.Information) return { ok: false, err: 'Alpha Vantage busy (demo limit) — add key: localStorage mt-alphavantage-key' };
+    var quotes = alphavantageQuotesFromJson(j);
+    if (!quotes) return { ok: false, err: 'No symbol matches' };
+    return { ok: true, j: { quotes: quotes } };
+  } catch (ex) {
+    return { ok: false, err: ex.message || 'Alpha Vantage failed' };
+  }
+}
+async function yahooFinanceSearchJson(qry) {
+  const enc = encodeURIComponent(qry);
+  const suf = 'quotesCount=18&newsCount=0';
+  const directUrls = [
+    'https://query2.finance.yahoo.com/v1/finance/search?q=' + enc + '&' + suf,
+    'https://query1.finance.yahoo.com/v1/finance/search?q=' + enc + '&' + suf
+  ];
+  const proxyUrls = [];
+  try {
+    const c = (localStorage.getItem('mt-yahoo-search-proxy') || '').trim().replace(/\/$/, '');
+    if (c.startsWith('http://') || c.startsWith('https://')) pushYahooSearchUrlUnique(proxyUrls, c + '?q=' + enc);
+  } catch (e) {}
+  pushYahooSearchUrlUnique(proxyUrls, MT_DEFAULT_VERCEL_PROXY.replace(/\/api\/anthropic\/?$/i, '/api/yahoo-search') + '?q=' + enc);
+  pushYahooSearchUrlUnique(proxyUrls, yahooSearchProxyUrl() + '?q=' + enc);
+  if (typeof location !== 'undefined' && /\.vercel\.app$/i.test(location.hostname)) {
+    pushYahooSearchUrlUnique(proxyUrls, location.origin + '/api/yahoo-search?q=' + enc);
+  }
+  async function tryLoad(url) {
+    try {
+      const r = await fetch(url);
+      const j = await r.json().catch(function() { return null; });
+      if (!r.ok) {
+        const msg = (j && j.error && (j.error.message || j.error)) || ('HTTP ' + r.status);
+        return { ok: false, err: String(msg) };
+      }
+      if (j == null || typeof j !== 'object') return { ok: false, err: 'Invalid JSON from search' };
+      return { ok: true, j: j };
+    } catch (ex) {
+      return { ok: false, err: ex.message || 'Failed to fetch' };
+    }
+  }
+  var blocked = isAnthropicDirectBlockedHere();
+  var lastErr = 'Symbol search unavailable';
+  if (blocked) {
+    var parallel = [tryAlphaVantageSymbolSearch(qry)].concat(proxyUrls.map(function(u) { return tryLoad(u); }));
+    var settled = await Promise.allSettled(parallel);
+    for (var pi = 0; pi < settled.length; pi++) {
+      if (settled[pi].status !== 'fulfilled') {
+        var reason = settled[pi].reason;
+        if (reason && reason.message) lastErr = reason.message;
+        continue;
+      }
+      var pt = settled[pi].value;
+      if (pt.ok) return pt.j;
+      lastErr = pt.err || lastErr;
+    }
+    throw new Error(lastErr);
+  }
+  var order = directUrls.concat(proxyUrls);
+  for (var i = 0; i < order.length; i++) {
+    var t = await tryLoad(order[i]);
+    if (t.ok) return t.j;
+    lastErr = t.err || lastErr;
+  }
+  var av2 = await tryAlphaVantageSymbolSearch(qry);
+  if (av2.ok) return av2.j;
+  lastErr = av2.err || lastErr;
+  throw new Error(lastErr);
 }
 async function anthropicMessages(bodyObj) {
   const proxy = getAnthropicProxyUrl();
@@ -705,15 +920,7 @@ async function fetchTickerSuggest() {
   box.classList.add('open');
   flashTickerSuggestOpen();
   try {
-    const r = await fetch('https://query2.finance.yahoo.com/v1/finance/search?q=' + encodeURIComponent(qry) + '&quotesCount=18&newsCount=0');
-    if (reqId !== tickerSuggestReqId || tEl.value.trim() !== qry) return;
-    if (!r.ok) {
-      box.innerHTML = '<div class="ticker-suggest-empty">Symbol search failed (' + r.status + '). You can still type a ticker and tab away to load the name.</div>';
-      box.classList.add('open');
-      flashTickerSuggestOpen();
-      return;
-    }
-    const j = await r.json();
+    const j = await yahooFinanceSearchJson(qry);
     if (reqId !== tickerSuggestReqId || tEl.value.trim() !== qry) return;
     let quotes = (j.quotes || []).filter(function(x) {
       if (!x || !x.symbol) return false;
@@ -753,7 +960,10 @@ async function fetchTickerSuggest() {
     renderTickerSuggestItems();
   } catch (e) {
     if (reqId !== tickerSuggestReqId || tEl.value.trim() !== qry) return;
-    box.innerHTML = '<div class="ticker-suggest-empty">Could not reach symbol search (network or blocker). Enter a ticker and tab away to fill the name.</div>';
+    const detail = e && e.message ? escapeHtml(e.message) : '';
+    box.innerHTML = '<div class="ticker-suggest-empty"><strong>Symbol search failed.</strong>' +
+      (detail ? '<br><span style="opacity:.9">' + detail + '</span>' : '') +
+      '<br><span style="opacity:.85;margin-top:8px;display:inline-block"><strong>Fix:</strong> In Vercel → Env → <code style="color:var(--cyan)">ALPHA_VANTAGE_KEY</code> (free at alphavantage.co), redeploy. Or in the browser:<br><code style="color:var(--cyan);font-size:11px;word-break:break-all">localStorage.setItem(&quot;mt-alphavantage-key&quot;,&quot;YOUR_KEY&quot;)</code></span><br>You can still type a ticker and tab away to fill the name.</div>';
     box.classList.add('open');
     flashTickerSuggestOpen();
   }
@@ -788,9 +998,7 @@ function fetchCompanyNameForTicker() {
       }
     } catch (e) { /* try search */ }
     try {
-      const r2 = await fetch('https://query2.finance.yahoo.com/v1/finance/search?q=' + encodeURIComponent(ticker) + '&quotesCount=8&newsCount=0');
-      if (!r2.ok) return;
-      const j2 = await r2.json();
+      const j2 = await yahooFinanceSearchJson(ticker);
       const quotes = j2.quotes || [];
       const q = quotes.find(x => symNorm(x.symbol) === ticker) || quotes[0];
       const name = q && (q.longname || q.shortname);
@@ -850,8 +1058,8 @@ function resetAddModalForm() {
   const wrap = document.getElementById('m-lot-rows');
   if (wrap) {
     wrap.innerHTML = '<div class="lot-row">' +
-      '<input class="m-lot-shares" type="number" placeholder="Shares" min="0.001" step="any" inputmode="decimal" oninput="updateLotsSummary()">' +
-      '<input class="m-lot-price" type="number" placeholder="Price ($)" min="0.01" step="any" inputmode="decimal" oninput="updateLotsSummary()">' +
+      '<input class="m-lot-shares" type="number" placeholder="# shares" min="0.001" step="any" inputmode="decimal" oninput="updateLotsSummary()">' +
+      '<input class="m-lot-price" type="number" placeholder="Price / share ($)" min="0.01" step="any" inputmode="decimal" oninput="updateLotsSummary()">' +
       '<button type="button" class="btn-lot-rm" onclick="removeLotRow(this)" title="Remove" style="visibility:hidden" aria-label="Remove row">−</button></div>';
   }
   syncLotRemoveButtons();
@@ -946,7 +1154,7 @@ async function addHolding() {
     if (!isNaN(s) && !isNaN(p) && s > 0 && p > 0) lotRows.push({ shares: s, price: p });
   });
   if (!ticker) return toast('Enter a ticker symbol', '#ff4d6a');
-  if (!lotRows.length) return toast('Add at least one purchase: shares and price per lot', '#ff4d6a');
+  if (!lotRows.length) return toast('Enter number of shares and price per share', '#ff4d6a');
   const merged = mergeLotsFromRows(lotRows);
   if(holdings.find(h => h.ticker === ticker)) return toast(ticker + ' already added', '#F0C040');
   try {
@@ -993,7 +1201,7 @@ function openEdit(id) {
   const lots = (h.lots && h.lots.length) ? h.lots : [{ shares: h.shares, price: h.cost }];
   const wrap = document.getElementById('e-lot-rows');
   wrap.innerHTML = lots.map((l, i) =>
-    '<div class="lot-row"><input class="e-lot-shares" type="number" placeholder="Shares" min="0.001" step="any" inputmode="decimal" value="' + l.shares + '" oninput="updateEditLotsSummary()"><input class="e-lot-price" type="number" placeholder="Price ($)" min="0.01" step="any" inputmode="decimal" value="' + l.price + '" oninput="updateEditLotsSummary()"><button type="button" class="btn-lot-rm" onclick="removeEditLotRow(this)" title="Remove" style="visibility:' + (lots.length > 1 ? 'visible' : 'hidden') + '" aria-label="Remove row">−</button></div>'
+    '<div class="lot-row"><input class="e-lot-shares" type="number" placeholder="# shares" min="0.001" step="any" inputmode="decimal" value="' + l.shares + '" oninput="updateEditLotsSummary()"><input class="e-lot-price" type="number" placeholder="Price / share ($)" min="0.01" step="any" inputmode="decimal" value="' + l.price + '" oninput="updateEditLotsSummary()"><button type="button" class="btn-lot-rm" onclick="removeEditLotRow(this)" title="Remove" style="visibility:' + (lots.length > 1 ? 'visible' : 'hidden') + '" aria-label="Remove row">−</button></div>'
   ).join('');
   syncEditLotRemoveButtons();
   updateEditLotsSummary();
@@ -1014,7 +1222,7 @@ function addEditLotRow() {
   if (!wrap) return;
   const row = document.createElement('div');
   row.className = 'lot-row';
-  row.innerHTML = '<input class="e-lot-shares" type="number" placeholder="Shares" min="0.001" step="any" inputmode="decimal" oninput="updateEditLotsSummary()"><input class="e-lot-price" type="number" placeholder="Price ($)" min="0.01" step="any" inputmode="decimal" oninput="updateEditLotsSummary()"><button type="button" class="btn-lot-rm" onclick="removeEditLotRow(this)" title="Remove" aria-label="Remove row">−</button>';
+  row.innerHTML = '<input class="e-lot-shares" type="number" placeholder="# shares" min="0.001" step="any" inputmode="decimal" oninput="updateEditLotsSummary()"><input class="e-lot-price" type="number" placeholder="Price / share ($)" min="0.01" step="any" inputmode="decimal" oninput="updateEditLotsSummary()"><button type="button" class="btn-lot-rm" onclick="removeEditLotRow(this)" title="Remove" aria-label="Remove row">−</button>';
   wrap.appendChild(row);
   syncEditLotRemoveButtons();
   updateEditLotsSummary();
@@ -1054,7 +1262,7 @@ async function saveEditedHolding() {
     const p = parseFloat(row.querySelector('.e-lot-price').value);
     if (!isNaN(s) && !isNaN(p) && s > 0 && p > 0) lotRows.push({ shares: s, price: p });
   });
-  if (!lotRows.length) return toast('Add at least one lot with shares and price', '#ff4d6a');
+  if (!lotRows.length) return toast('Enter shares and price per share for at least one row', '#ff4d6a');
   const merged = mergeLotsFromRows(lotRows);
   setSyncStatus('syncing');
   h.name = name || ticker;
@@ -1075,30 +1283,25 @@ async function saveEditedHolding() {
 
 // ─── Price Fetching ──────────────────────────────────────
 async function fetchPriceFor(ticker) {
-  if (!canCallAnthropic()) return false;
+  if (!canCallAI()) return false;
   try {
-    const res = await anthropicMessages({
-        model: CLAUDE_MODEL, max_tokens: 220,
-        tools:[{type:'web_search_20250305', name:'web_search'}],
-        messages:[{role:'user', content:'Search for the current stock price of ' + ticker + '. Reply ONLY with a JSON object, nothing else: {"price":123.45,"change":1.23,"changePct":0.92,"companyName":"Company Name"}'}]
-    });
-    const d = await res.json();
-    const tb = d.content && d.content.find(b => b.type === 'text');
-    if(tb) {
-      const m = tb.text.replace(/```json|```/g,'').trim().match(/\{[\s\S]*?\}/);
-      if(m) {
-        const p = JSON.parse(m[0]);
-        if(p && p.price) {
-          prices[ticker] = {...p, updatedAt: Date.now()};
-          localStorage.setItem('mt-prices', JSON.stringify(prices));
-          // Update company name in DB if it was auto-detected
-          const h = holdings.find(h => h.ticker === ticker);
-          if(h && (!h.name || h.name === ticker) && p.companyName) {
-            h.name = p.companyName;
-            if(h.id && currentUser) dbUpdateName(h.id, p.companyName);
-          }
-          return true;
+    const out = await aiCompleteForPrompt(
+      'Search for the current stock price of ' + ticker + '. Reply ONLY with a JSON object, nothing else: {"price":123.45,"change":1.23,"changePct":0.92,"companyName":"Company Name"}',
+      220,
+      true
+    );
+    const m = (out.text || '').replace(/```json|```/g,'').trim().match(/\{[\s\S]*?\}/);
+    if (m) {
+      const p = JSON.parse(m[0]);
+      if (p && p.price) {
+        prices[ticker] = {...p, updatedAt: Date.now()};
+        localStorage.setItem('mt-prices', JSON.stringify(prices));
+        const h = holdings.find(h => h.ticker === ticker);
+        if (h && (!h.name || h.name === ticker) && p.companyName) {
+          h.name = p.companyName;
+          if (h.id && currentUser) dbUpdateName(h.id, p.companyName);
         }
+        return true;
       }
     }
   } catch(e) { console.warn(e); }
@@ -1180,8 +1383,8 @@ function openDetail(ticker) {
   const plN=v-ct,plP=ct>0?plN/ct*100:0,cls=plN>=0?'pos':'neg';
   let lotsBlock = '';
   if (h.lots && h.lots.length > 1) {
-    lotsBlock = '<div style="margin-bottom:14px"><div style="font-size:10px;color:var(--muted);font-family:\'DM Mono\',monospace;margin-bottom:8px;letter-spacing:.5px">PURCHASE LOTS</div>' +
-      h.lots.map(l => '<div style="display:flex;justify-content:space-between;font-size:12px;font-family:\'DM Mono\',monospace;color:var(--text);margin-bottom:5px"><span>' + l.shares + ' sh</span><span>' + fmtC(l.price) + ' each</span></div>').join('') + '</div>';
+    lotsBlock = '<div style="margin-bottom:14px"><div style="font-size:10px;color:var(--muted);font-family:\'DM Mono\',monospace;margin-bottom:8px;letter-spacing:.5px">SHARES BY BUY</div>' +
+      h.lots.map(l => '<div style="display:flex;justify-content:space-between;font-size:12px;font-family:\'DM Mono\',monospace;color:var(--text);margin-bottom:5px"><span>' + l.shares + ' shares</span><span>' + fmtC(l.price) + ' / sh</span></div>').join('') + '</div>';
   }
   document.getElementById('detailContent').innerHTML=
     '<div style="font-family:\'DM Mono\',monospace;font-size:10px;color:var(--muted);letter-spacing:.5px;margin-bottom:3px">'+ticker+'</div>'+
@@ -1266,13 +1469,10 @@ async function fetchNews() {
   const tickers=holdings.map(h=>h.ticker).join(', ');
   w.innerHTML='<div class="loading-row"><div class="spinner"></div> Fetching news for '+tickers+'…</div>';
   try {
-    if (!canCallAnthropic()) { w.innerHTML='<div class="empty"><div class="empty-icon">🔑</div><div class="empty-text">Set API key or proxy (see Advice tab help)</div></div>'; return; }
-    const res=await anthropicMessages({model: CLAUDE_MODEL, max_tokens: 900,
-        tools:[{type:'web_search_20250305',name:'web_search'}],
-        messages:[{role:'user',content:'News (48h) for: '+tickers+'. JSON only, max 6 items: [{"ticker":"AAPL","title":"…","summary":"one line","source":"…","age":"…","sentiment":"positive|negative|neutral"}]'}]});
-    const d=await res.json();
-    const tb=d.content&&d.content.find(b=>b.type==='text');
-    if(tb){const m=tb.text.replace(/```json|```/g,'').trim().match(/\[[\s\S]*\]/);if(m){renderNews(JSON.parse(m[0]));return;}}
+    if (!canCallAI()) { w.innerHTML='<div class="empty"><div class="empty-icon">🔑</div><div class="empty-text">Set Gemini or Claude (see Advice tab)</div></div>'; return; }
+    const out = await aiCompleteForPrompt('News (48h) for: '+tickers+'. JSON only, max 6 items: [{"ticker":"AAPL","title":"…","summary":"one line","source":"…","age":"…","sentiment":"positive|negative|neutral"}]', 900, true);
+    const m = (out.text || '').replace(/```json|```/g,'').trim().match(/\[[\s\S]*\]/);
+    if (m) { renderNews(JSON.parse(m[0])); return; }
     w.innerHTML='<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">Could not load news. Try again.</div></div>';
   } catch(e){ w.innerHTML='<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">News error.</div></div>'; }
 }
@@ -1336,12 +1536,13 @@ function formatStocksInfoForPrompt(stocks) {
 function showAdviceApiError(w, msg) {
   const m = msg || 'Unknown error';
   const rate = /rate limit|rate_limit|tokens per minute|TPM|429/i.test(m);
-  const viaProxy = typeof window !== 'undefined' && window.__mtLastAiUrl && window.__mtLastAiUrl.indexOf('anthropic.com') === -1;
+  const last = typeof window !== 'undefined' && window.__mtLastAiUrl ? window.__mtLastAiUrl : '';
+  const viaProxy = last && !/api\.anthropic\.com|generativelanguage\.googleapis\.com/i.test(last);
   let extra = '';
   if (rate) {
-    extra = '<div class="name-hint" style="margin-top:12px;text-align:left">Your Anthropic org hit a <strong>per-minute token limit</strong>. Wait ~60 seconds and try again, or use <strong>Advice</strong> on one stock. <strong>Run All</strong> now analyzes one position at a time with pauses to reduce bursts.</div>';
+    extra = '<div class="name-hint" style="margin-top:12px;text-align:left">Rate or quota limit. Wait ~60s, try one stock, or switch provider: <code style="color:var(--cyan)">localStorage.setItem(&quot;mt-ai-provider&quot;,&quot;gemini&quot;)</code> or <code style="color:var(--cyan)">anthropic</code>.</div>';
   } else if (viaProxy) {
-    extra = '<div class="name-hint" style="margin-top:12px">If this is not a rate limit: check Vercel env <code style="color:var(--cyan)">ANTHROPIC_API_KEY</code> and function logs.</div>';
+    extra = '<div class="name-hint" style="margin-top:12px">Vercel proxy: set <code style="color:var(--cyan)">GEMINI_API_KEY</code> (Google AI Studio) and/or <code style="color:var(--cyan)">ANTHROPIC_API_KEY</code>; redeploy <code style="color:var(--cyan)">api/gemini.js</code> + <code style="color:var(--cyan)">api/anthropic.js</code>.</div>';
   }
   w.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><div class="empty-text">API: ' + escapeHtml(m) + '</div>' + extra + '</div>';
   toast(rate ? 'Rate limit — wait and retry' : 'AI API error — see Advice tab', '#ff4d6a');
@@ -1349,37 +1550,28 @@ function showAdviceApiError(w, msg) {
 
 async function requestAdviceArray(stocksSlice) {
   const info = formatStocksInfoForPrompt(stocksSlice);
-  const res = await anthropicMessages({
-    model: CLAUDE_MODEL,
-    max_tokens: ADVICE_MAX_OUT,
-    tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-    messages: [{ role: 'user', content: buildFundamentalAnalysisPrompt(info) }]
-  });
-  const d = await res.json().catch(function() { return {}; });
-  if (!res.ok) {
-    const msg = (d.error && d.error.message) || d.message || ('HTTP ' + res.status);
-    return { ok: false, msg: msg };
-  }
-  const tb = d.content && d.content.find(function(b) { return b.type === 'text'; });
-  if (tb) {
-    const matched = tb.text.replace(/```json|```/g, '').trim().match(/\[[\s\S]*\]/);
+  try {
+    const out = await aiCompleteForPrompt(buildFundamentalAnalysisPrompt(info), ADVICE_MAX_OUT, true);
+    const matched = (out.text || '').replace(/```json|```/g, '').trim().match(/\[[\s\S]*\]/);
     if (matched) {
       try {
         const arr = JSON.parse(matched[0]);
         if (Array.isArray(arr) && arr.length) return { ok: true, arr: arr };
       } catch (pe) { console.warn(pe); }
     }
+    return { ok: false, msg: 'Could not parse AI JSON. Try again.' };
+  } catch (e) {
+    return { ok: false, msg: e.message || String(e) };
   }
-  return { ok: false, msg: 'Could not parse AI JSON. Try again.' };
 }
 
 async function callAI(stocks) {
   const w=document.getElementById('adviceWrap');
   if(!w) { toast('Advice panel not found'); return false; }
   if(!stocks||!stocks.length) { w.innerHTML='<div class="empty"><div class="empty-icon">🤖</div><div class="empty-text">No holdings to analyze.</div></div>'; return false; }
-  if(!canCallAnthropic()) {
-    w.innerHTML='<div class="empty"><div class="empty-icon">🔑</div><div class="empty-text">Connect Claude (proxy on GitHub Pages)</div><div class="name-hint" style="margin-top:12px;text-align:left">On <strong>github.io</strong> the app uses your Vercel proxy only (browser blocks api.anthropic.com). Deploy <code style="color:var(--cyan)">api/anthropic.js</code> on Vercel with env <code style="color:var(--cyan)">ANTHROPIC_API_KEY</code> and set Vercel <code style="color:var(--cyan)">ALLOW_ORIGIN</code> to <code style="color:var(--cyan)">https://midastechinc.github.io</code>. Push the latest <code style="color:var(--cyan)">index.html</code> to GitHub. Optional override:<br><code style="color:var(--cyan);word-break:break-all">localStorage.setItem(&quot;mt-anthropic-proxy&quot;,&quot;https://….vercel.app/api/anthropic&quot;)</code></div></div>';
-    toast('Use proxy on GitHub Pages — see Advice tab', '#F0C040');
+  if(!canCallAI()) {
+    w.innerHTML='<div class="empty"><div class="empty-icon">🔑</div><div class="empty-text">Connect AI (Gemini free tier or Claude)</div><div class="name-hint" style="margin-top:12px;text-align:left"><strong>GitHub Pages</strong> uses Vercel proxies. Deploy <code style="color:var(--cyan)">api/gemini.js</code> + env <code style="color:var(--cyan)">GEMINI_API_KEY</code> (free: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--cyan)">Google AI Studio</a>), and/or <code style="color:var(--cyan)">api/anthropic.js</code> + <code style="color:var(--cyan)">ANTHROPIC_API_KEY</code>. Default tries <strong>Gemini first</strong>, then Claude (<code style="color:var(--cyan)">mt-ai-provider</code> = auto | gemini | anthropic). Local dev: <code style="color:var(--cyan)">mt-gemini-key</code> or <code style="color:var(--cyan)">mt-anthropic-key</code>.</div></div>';
+    toast('Add Gemini or Claude — see Advice tab', '#F0C040');
     return false;
   }
   const fullContext = stocks;
@@ -1418,11 +1610,11 @@ async function callAI(stocks) {
     const looksLikeCors=/failed to fetch|networkerror|load failed|network request failed/i.test(m);
     let last='';
     try { last = window.__mtLastAiUrl || ''; } catch (z) {}
-    const hitProxy=last && last.indexOf('anthropic.com')===-1;
-    const hitDirect=last && last.indexOf('anthropic.com')!==-1;
+    const hitProxy=last && !/api\.anthropic\.com|generativelanguage\.googleapis\.com/i.test(last);
+    const hitDirect=last && /api\.anthropic\.com|generativelanguage\.googleapis\.com/i.test(last);
     let hint='';
     if (looksLikeCors && hitDirect) {
-      hint='<div class="name-hint" style="margin-top:12px;text-align:left">The page tried <strong>api.anthropic.com</strong> directly (blocked from GitHub Pages). Use the latest <code style="color:var(--cyan)">index.html</code> (default proxy) or set:<br><code style="color:var(--cyan);word-break:break-all">localStorage.setItem(&quot;mt-anthropic-proxy&quot;,&quot;https://portfolio-lake-delta-uzgpfwpwmx.vercel.app/api/anthropic&quot;)</code></div>';
+      hint='<div class="name-hint" style="margin-top:12px;text-align:left">Direct API call blocked from this origin. Use Vercel proxies (<code style="color:var(--cyan)">api/gemini.js</code> + <code style="color:var(--cyan)">api/anthropic.js</code>) or set <code style="color:var(--cyan)">mt-gemini-proxy</code> / <code style="color:var(--cyan)">mt-anthropic-proxy</code>.</div>';
     } else if (looksLikeCors && hitProxy) {
       hint='<div class="name-hint" style="margin-top:12px;text-align:left">The <strong>Vercel proxy</strong> request failed (often CORS). Redeploy the latest <code style="color:var(--cyan)">api/anthropic.js</code> (open CORS). Remove env <code style="color:var(--cyan)">ALLOW_ORIGIN</code> unless you set <code style="color:var(--cyan)">CORS_STRICT=1</code> and an exact origin match. Tried: <code style="color:var(--cyan);word-break:break-all">'+escapeHtml(last)+'</code></div>';
     } else if (looksLikeCors) {
