@@ -1,5 +1,7 @@
 # Midas Portfolio — Setup Guide
 
+**This repo is only the Midas investment portfolio app** (`index.html`, holdings, AI advice, Vercel API routes). It is **not** the Studio B Instagram designer. That project is a **separate Git repo** next to this one: `studiob-home-post-studio` (sibling folder under the same `Codex` directory). Open each folder in its own Cursor window or clone each remote separately so they never share one workspace root.
+
 Get your investment dashboard live at **midastechinc.github.io/portfolio** in about 10 minutes.
 
 ---
